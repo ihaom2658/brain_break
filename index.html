@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <title>Multitasking Dodge - Neon Professional</title>
     <meta name="description" content="극한의 멀티태스킹 능력을 시험하는 네온 닷지 게임">
+    <script>
+      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
     <style>
         :root { 
             --primary-color: #f1c40f; 
@@ -42,7 +46,7 @@
 
 <div id="countdown-text"></div>
 <div id="game-ui">TIME: <span id="timer">0.0</span>s | STAGE: <span id="stage-val">1</span></div>
-<div id="version-tag">Ver 1.2.2</div>
+<div id="version-tag">Ver 1.2.3</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -189,41 +193,32 @@
         py: 0, v: 0, ground: true, obsX: 0,
         init() { this.py = OY + GH - 25; this.v = 0; this.ground = true; this.obsX = OX - 100; },
         update() {
-            // 점프 메커니즘 개선 (중력 하향 및 점프력 최적화)
             if(keys['Space'] && this.ground) { this.v = -9.2; this.ground = false; }
-            this.v += 0.32; // 중력 더 낮춤 (부드러운 낙하)
+            this.v += 0.32;
             this.py += this.v;
             if(this.py >= OY + GH - 25) { this.py = OY + GH - 25; this.v = 0; this.ground = true; }
             
             if(score > 22) { 
-                // 장애물 오는 빈도 및 속도 최적화
                 let moveSpeed = (currentDiff === 'EASY' ? 2.8 : 4.0);
                 this.obsX += moveSpeed; 
-                // 화면 오른쪽 끝까지 가지 않고 일정 거리 도달 시 왼쪽에서 재생성 (빈도 조절)
                 if(this.obsX > OX + GW/2 + 100) this.obsX = OX - 50;
             } else { this.obsX = OX - 50; }
             
             const playerX = OX + GW/2 - 80;
-            // 판정 크기 축소 (18 -> 14)
             if(Math.abs(this.obsX - playerX) < 14 && this.py > OY + GH - 40) stopGame("AREA 3: 충돌!");
         },
         draw() {
             let darkness = 0;
             if(score >= 80) darkness = Math.min(1, (score - 80) / 5);
-            
-            // 구역 배경
             ctx.fillStyle = `rgba(0, 255, 0, ${0.05 * (1 - darkness)})`;
             ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
             
-            // 암전 효과 (85초 이후에는 내부의 모든 것이 검정색이 됨)
             if(darkness >= 1) {
                 ctx.fillStyle = "#000";
                 ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
             } else {
-                // 캐릭터
                 ctx.fillStyle = `rgba(0, 255, 0, ${1 - darkness})`;
                 ctx.fillRect(OX + GW/2 - 90, this.py-20, 20, 20);
-                // 장애물
                 ctx.fillStyle = `rgba(255, 255, 0, ${1 - darkness})`;
                 ctx.fillRect(this.obsX, OY + GH - 40, 15, 40);
             }
