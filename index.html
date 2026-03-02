@@ -30,7 +30,6 @@
 
         #game-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-size: 24px; z-index: 200; display: none; font-weight: bold; color: var(--neon-mint); text-align: center; width: 100%; }
         #countdown-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; font-weight: bold; color: var(--primary-color); z-index: 300; display: none; }
-        #guide-msg { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: bold; color: #fff; z-index: 250; text-align: center; pointer-events: none; display: none; text-shadow: 0 0 15px rgba(0,0,0,1); }
         
         canvas { position: fixed; top: 0; left: 0; z-index: 10; display: none; cursor: none; }
         #version-tag { position: fixed; bottom: 12px; right: 18px; font-size: 14px; color: rgba(255, 255, 255, 0.3); z-index: 500; }
@@ -42,9 +41,8 @@
 <body>
 
 <div id="countdown-text"></div>
-<div id="guide-msg"></div>
 <div id="game-ui">TIME: <span id="timer">0.0</span>s | STAGE: <span id="stage-val">1</span></div>
-<div id="version-tag">Ver 1.2.0</div>
+<div id="version-tag">Ver 1.2.1</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -65,16 +63,8 @@
 
     <div class="content-section">
         <h2>멀티태스킹 닷지: 인지 능력의 한계를 넘어서</h2>
-        <p>현대 게임 환경에서 멀티태스킹 능력은 필수적인 요소입니다. 단순히 하나에 집중하는 것을 넘어, 시각 정보의 분할 처리와 각기 다른 출력 장치의 독립적 제어는 게이머에게 정점의 실력을 부여합니다. NEON DODGE는 이러한 뇌의 처리 메커니즘을 극한으로 끌어올리기 위해 설계되었습니다.</p>
-        
-        <h2>구역별 미션 가이드</h2>
-        <p><strong>Area 1 (Top-Left):</strong> 정밀한 마우스 컨트롤이 요구됩니다. 쏟아지는 네온 블록 사이를 최소한의 움직임으로 통과하세요. 이 구역은 당신의 눈과 손의 협응력을 담당합니다.</p>
-        <p><strong>Area 2 (Top-Right):</strong> 키보드 A, D 키를 이용한 좌우 회피 구역입니다. 마우스로 1구역을 피하는 동시에 왼손으로는 리듬감 있게 낙하물을 피해야 합니다.</p>
-        <p><strong>Area 3 (Bottom-Left):</strong> 타이밍 기반의 점프 액션 구역입니다. 스페이스 바를 사용하여 장애물을 넘으세요. 캐릭터가 오른쪽에 위치하며 왼쪽에서 다가오는 벽을 피해야 합니다.</p>
-        <p><strong>Area 4 (Bottom-Right):</strong> 클릭 기반의 리소스 관리 구역입니다. 자동으로 차오르는 게이지가 폭발하지 않도록 주기적으로 해당 구역을 클릭하여 초기화해야 합니다.</p>
-
-        <h2>고급 전략: 주변시와 분할 뇌</h2>
-        <p>숙련된 플레이어는 화면의 중앙 분할선을 응시합니다. 한 구역에 시선을 고정하는 순간 다른 구역의 정보를 놓치게 됩니다. 전체 화면을 하나의 패턴으로 인식하고, 각 입력 장치를 독립적인 스레드로 처리하는 '뇌의 병렬화'를 경험해 보십시오. 스테이지가 올라갈수록 이 능력은 생존의 유일한 열쇠가 됩니다.</p>
+        <p>현대 게임 환경에서 멀티태스킹 능력은 필수적인 요소입니다. 단순히 하나에 집중하는 것을 넘어, 시각 정보의 분할 처리와 각기 다른 출력 장치의 독립적 제어는 게이머에게 정점의 실력을 부여합니다.</p>
+        <p><strong>60초 이후부터는 각 구역이 순차적으로 LEVEL UP! 되며 극한의 난이도로 진입합니다.</strong></p>
     </div>
 </div>
 
@@ -108,7 +98,8 @@
 
     let gameActive = false, score = 0, stage = 1, currentDiff = 'EASY';
     let p1 = { x: 0, y: 0 }, keys = {};
-    let warnArea = 0;
+    let warnArea = 0; 
+    let levelUpArea = 0; // LEVEL UP 메시지 출력용
 
     const GW = 800, GH = 600;
     let OX, OY;
@@ -137,19 +128,23 @@
                 rank++;
             });
             listDiv.innerHTML = (rank === 1) ? "기록 없음" : html + "</table>";
-        } catch(e) { 
-            console.error(e);
-            listDiv.innerHTML = "로드 실패"; 
-        }
+        } catch(e) { listDiv.innerHTML = "로드 실패"; }
     };
     loadRanking('EASY');
 
     const area1 = {
         enemies: [],
         update() {
-            const spawnRate = currentDiff === 'EASY' ? 0.01 : 0.02;
-            const speedBase = currentDiff === 'EASY' ? 1.0 : 1.8;
-            if(this.enemies.length < 3 && Math.random() < spawnRate) {
+            let spawnRate = currentDiff === 'EASY' ? 0.01 : 0.02;
+            let speedBase = currentDiff === 'EASY' ? 1.0 : 1.8;
+            
+            // 60초 이후 난이도 상승
+            if(score > 60) {
+                spawnRate *= 2.0;
+                speedBase *= 1.5;
+            }
+
+            if(this.enemies.length < (score > 60 ? 6 : 3) && Math.random() < spawnRate) {
                 this.enemies.push({x: OX + Math.random()*(GW/2 - 20) + 10, y: OY - 20, s: speedBase + Math.random()*1.0});
             }
             this.enemies.forEach(e => {
@@ -175,8 +170,16 @@
         update() {
             if(keys['KeyA'] && this.px > OX + GW/2 + 15) this.px -= 3;
             if(keys['KeyD'] && this.px < OX + GW - 15) this.px += 3;
-            const spawnRate = currentDiff === 'EASY' ? 0.008 : 0.015;
-            const speedBase = (currentDiff === 'EASY' ? 2.0 : 3.5) * 0.65;
+            
+            let spawnRate = currentDiff === 'EASY' ? 0.008 : 0.015;
+            let speedBase = (currentDiff === 'EASY' ? 2.0 : 3.5) * 0.65;
+            
+            // 70초 이후 난이도 상승
+            if(score > 70) {
+                spawnRate *= 2.2;
+                speedBase *= 1.4;
+            }
+
             if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: speedBase});
             this.balls.forEach(b => {
                 b.y += b.s;
@@ -197,45 +200,34 @@
 
     const area3 = {
         py: 0, v: 0, ground: true, obsX: 0,
-        init() { 
-            this.py = OY + GH - 25; 
-            this.v = 0;
-            this.ground = true;
-            this.obsX = OX - 100; // 초기 화면 밖 왼쪽 위치
-        },
+        init() { this.py = OY + GH - 25; this.v = 0; this.ground = true; this.obsX = OX - 100; },
         update() {
-            // 점프 메커니즘 개선 (더 부드러운 중력 적용)
-            if(keys['Space'] && this.ground) { 
-                this.v = -10.5; // 점프력 살짝 하향
-                this.ground = false; 
-            }
-            this.v += 0.45; // 중력 대폭 하향하여 부드럽게 낙하
-            this.py += this.v;
+            if(keys['Space'] && this.ground) { this.v = -10.5; this.ground = false; }
+            this.v += 0.45; this.py += this.v;
+            if(this.py >= OY + GH - 25) { this.py = OY + GH - 25; this.v = 0; this.ground = true; }
             
-            if(this.py >= OY + GH - 25) { 
-                this.py = OY + GH - 25; 
-                this.v = 0;
-                this.ground = true; 
-            }
-            
-            // 20초 이후 2초 여유 후 왼쪽에서 오른쪽으로 벽 이동 (오른쪽의 플레이어를 향함)
             if(score > 22) { 
-                const moveSpeed = (currentDiff === 'EASY' ? 3.0 : 4.5); // 벽 속도 하향
+                let moveSpeed = (currentDiff === 'EASY' ? 3.0 : 4.5);
                 this.obsX += moveSpeed; 
-                if(this.obsX > OX + GW/2) this.obsX = OX - 20; // 왼쪽 끝에서 재출발
-            } else {
-                this.obsX = OX - 50; // 대기
-            }
+                if(this.obsX > OX + GW/2) this.obsX = OX - 20;
+            } else { this.obsX = OX - 50; }
             
-            // 충돌 판정 (플레이어는 오른쪽 OX + GW/2 - 80 위치)
             const playerX = OX + GW/2 - 80;
             if(Math.abs(this.obsX - playerX) < 18 && this.py > OY + GH - 45) stopGame("AREA 3: 충돌!");
         },
         draw() {
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
+            // 80초~85초 사이 점점 검은색으로 변함
+            let bgAlpha = 0.05;
+            if(score >= 80) {
+                let darkness = Math.min(1, (score - 80) / 5);
+                ctx.fillStyle = `rgba(0, 0, 0, ${darkness})`;
+                ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
+                bgAlpha = 0.05 * (1 - darkness);
+            }
+            ctx.fillStyle = `rgba(0, 255, 0, ${bgAlpha})`;
             ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
+
             ctx.fillStyle = '#0f0';
-            // 캐릭터 위치를 오른쪽으로 변경
             ctx.fillRect(OX + GW/2 - 90, this.py-20, 20, 20);
             ctx.fillStyle = '#ff0';
             ctx.fillRect(this.obsX, OY + GH - 40, 15, 40);
@@ -245,7 +237,10 @@
     const area4 = {
         g: 0,
         update() {
-            this.g += (currentDiff === 'EASY' ? 0.15 : 0.30);
+            let increase = (currentDiff === 'EASY' ? 0.15 : 0.30);
+            if(score > 90) increase *= 1.6; // 90초 이후 1.6배 가속
+            
+            this.g += increase;
             if(this.g >= 100) stopGame("AREA 4: 폭발!");
         },
         draw() {
@@ -258,17 +253,16 @@
         }
     };
 
-    function drawWarningInArea(stageNum) {
+    function drawInfo(areaNum, text) {
         ctx.fillStyle = "rgba(241, 196, 15, 0.9)";
         ctx.font = "bold 22px Pretendard";
         ctx.textAlign = "center";
-        let tx, ty, msg = "";
-        if(stageNum === 2) { tx = OX + GW*0.75; ty = OY + GH/4; msg = "A, D로 이동!"; }
-        if(stageNum === 3) { tx = OX + GW/4; ty = OY + GH*0.75; msg = "SPACE로 점프!"; }
-        if(stageNum === 4) { tx = OX + GW*0.75; ty = OY + GH*0.75; msg = "클릭하여 해제!"; }
-        
-        ctx.fillText("잠시 후 시작", tx, ty - 15);
-        ctx.fillText(msg, tx, ty + 15);
+        let tx, ty;
+        if(areaNum === 1) { tx = OX + GW/4; ty = OY + GH/4; }
+        if(areaNum === 2) { tx = OX + GW*0.75; ty = OY + GH/4; }
+        if(areaNum === 3) { tx = OX + GW/4; ty = OY + GH*0.75; }
+        if(areaNum === 4) { tx = OX + GW*0.75; ty = OY + GH*0.75; }
+        ctx.fillText(text, tx, ty);
     }
 
     window.addEventListener('keydown', e => { 
@@ -287,7 +281,11 @@
         const rect = canvas.getBoundingClientRect();
         const rx = e.clientX - rect.left;
         const ry = e.clientY - rect.top;
-        if(rx > GW/2 && ry > GH/2) area4.g = 0;
+        if(rx > GW/2 && ry > GH/2) {
+            // 90초 이후에는 감소량 절반 (25% -> 12.5%)
+            let decrease = (score > 90) ? 12.5 : 25;
+            area4.g = Math.max(0, area4.g - decrease);
+        }
     });
 
     window.runGame = (diff) => {
@@ -332,20 +330,32 @@
         score += 1/60;
         timerEl.innerText = score.toFixed(1);
 
+        // 구역별 스테이지 진입 알림 (2초 전)
         warnArea = 0;
         if(score >= 8 && score < 10) warnArea = 2;
         if(score >= 18 && score < 20) warnArea = 3;
         if(score >= 28 && score < 30) warnArea = 4;
 
+        // 구역별 Level Up 알림 (1초간 유지)
+        levelUpArea = 0;
+        if(score >= 60 && score < 61) levelUpArea = 1;
+        if(score >= 70 && score < 71) levelUpArea = 2;
+        if(score >= 80 && score < 81) levelUpArea = 3;
+        if(score >= 90 && score < 91) levelUpArea = 4;
+
         if(score > 30) stage = 4; else if(score > 20) stage = 3; else if(score > 10) stage = 2;
-        document.getElementById('stage-val').innerText = stage;
+        stageValEl.innerText = stage;
 
         area1.update(); area1.draw();
         if(stage >= 2) { area2.update(); area2.draw(); }
         if(stage >= 3) { area3.update(); area3.draw(); }
         if(stage >= 4) { area4.update(); area4.draw(); }
 
-        if(warnArea > 0) drawWarningInArea(warnArea);
+        // 알림 메시지 출력
+        if(warnArea === 2) drawInfo(2, "잠시 후 시작: A, D 이동");
+        if(warnArea === 3) drawInfo(3, "잠시 후 시작: SPACE 점프");
+        if(warnArea === 4) drawInfo(4, "잠시 후 시작: 클릭 해제");
+        if(levelUpArea > 0) drawInfo(levelUpArea, "LEVEL UP!");
 
         ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
         ctx.strokeRect(OX, OY, GW, GH);
