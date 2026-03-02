@@ -46,7 +46,7 @@
 
 <div id="countdown-text"></div>
 <div id="game-ui">TIME: <span id="timer">0.0</span>s | STAGE: <span id="stage-val">1</span></div>
-<div id="version-tag">Ver 1.2.3</div>
+<div id="version-tag">Ver 1.2.4</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -84,6 +84,72 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+    // --- BGM System (Web Audio API) ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx;
+    let mainOsc, bassOsc, leadOsc;
+    let mainGain, bassGain, leadGain, masterGain;
+    let isPlaying = false;
+
+    function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new AudioContext();
+        masterGain = audioCtx.createGain();
+        masterGain.connect(audioCtx.destination);
+        masterGain.gain.value = 0.15;
+    }
+
+    function playBGM(stageNum) {
+        if (!audioCtx) initAudio();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        
+        // Stage 1: 베이스 비트
+        if (!bassOsc) {
+            bassOsc = audioCtx.createOscillator();
+            bassGain = audioCtx.createGain();
+            bassOsc.type = 'square';
+            bassOsc.frequency.setValueAtTime(55, audioCtx.currentTime); // A1
+            bassOsc.connect(bassGain);
+            bassGain.connect(masterGain);
+            bassGain.gain.value = 0.5;
+            bassOsc.start();
+        }
+
+        // Stage 2: 신스 멜로디 레이어
+        if (stageNum >= 2 && !mainOsc) {
+            mainOsc = audioCtx.createOscillator();
+            mainGain = audioCtx.createGain();
+            mainOsc.type = 'sawtooth';
+            mainOsc.frequency.setValueAtTime(220, audioCtx.currentTime); // A3
+            mainOsc.connect(mainGain);
+            mainGain.connect(masterGain);
+            mainGain.gain.value = 0.3;
+            mainOsc.start();
+        }
+
+        // Stage 4: 고조되는 리드 사운드
+        if (stageNum >= 4 && !leadOsc) {
+            leadOsc = audioCtx.createOscillator();
+            leadGain = audioCtx.createGain();
+            leadOsc.type = 'triangle';
+            leadOsc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+            leadOsc.connect(leadGain);
+            leadGain.connect(masterGain);
+            leadGain.gain.value = 0.2;
+            leadOsc.start();
+        }
+
+        // 사운드 변화 효과 (LFO 느낌)
+        const now = audioCtx.currentTime;
+        if (bassOsc) bassOsc.frequency.exponentialRampToValueAtTime(stageNum * 20 + 40, now + 0.5);
+        if (mainOsc) mainOsc.frequency.exponentialRampToValueAtTime(220 + (stageNum * 50), now + 0.2);
+    }
+
+    function stopBGM() {
+        if (masterGain) masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+    }
+
+    // --- Game Logic ---
     const firebaseConfig = {
         apiKey: "AIzaSyCWvmTD7ZqrM8QS2jAtIoxyYw9zDghyyZo",
         authDomain: "dummy-server-ff1b9.firebaseapp.com",
@@ -212,10 +278,8 @@
             if(score >= 80) darkness = Math.min(1, (score - 80) / 5);
             ctx.fillStyle = `rgba(0, 255, 0, ${0.05 * (1 - darkness)})`;
             ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
-            
             if(darkness >= 1) {
-                ctx.fillStyle = "#000";
-                ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
+                ctx.fillStyle = "#000"; ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
             } else {
                 ctx.fillStyle = `rgba(0, 255, 0, ${1 - darkness})`;
                 ctx.fillRect(OX + GW/2 - 90, this.py-20, 20, 20);
@@ -278,6 +342,7 @@
     });
 
     window.runGame = (diff) => {
+        initAudio(); // 클릭 핸들러 내부에서 오디오 초기화
         currentDiff = diff;
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('countdown-text').style.display = 'block';
@@ -306,6 +371,7 @@
     function stopGame(reason) {
         if(!gameActive) return;
         gameActive = false;
+        stopBGM(); // 게임 오버 시 음악 정지
         document.exitPointerLock();
         canvas.style.display = 'none';
         document.getElementById('game-ui').style.display = 'none';
@@ -319,6 +385,13 @@
         score += 1/60;
         timerEl.innerText = score.toFixed(1);
 
+        let prevStage = stage;
+        if(score > 30) stage = 4; else if(score > 20) stage = 3; else if(score > 10) stage = 2; else stage = 1;
+        stageValEl.innerText = stage;
+        
+        // 스테이지 변화에 따른 BGM 업데이트
+        playBGM(stage);
+
         warnArea = 0;
         if(score >= 8 && score < 10) warnArea = 2;
         if(score >= 18 && score < 20) warnArea = 3;
@@ -329,9 +402,6 @@
         if(score >= 70 && score < 71) levelUpArea = 2;
         if(score >= 80 && score < 81) levelUpArea = 3;
         if(score >= 90 && score < 91) levelUpArea = 4;
-
-        if(score > 30) stage = 4; else if(score > 20) stage = 3; else if(score > 10) stage = 2;
-        stageValEl.innerText = stage;
 
         area1.update(); area1.draw();
         if(stage >= 2) { area2.update(); area2.draw(); }
