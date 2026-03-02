@@ -42,7 +42,7 @@
 
 <div id="countdown-text"></div>
 <div id="game-ui">TIME: <span id="timer">0.0</span>s | STAGE: <span id="stage-val">1</span></div>
-<div id="version-tag">Ver 1.2.1</div>
+<div id="version-tag">Ver 1.2.2</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -99,7 +99,7 @@
     let gameActive = false, score = 0, stage = 1, currentDiff = 'EASY';
     let p1 = { x: 0, y: 0 }, keys = {};
     let warnArea = 0; 
-    let levelUpArea = 0; // LEVEL UP 메시지 출력용
+    let levelUpArea = 0;
 
     const GW = 800, GH = 600;
     let OX, OY;
@@ -137,13 +137,7 @@
         update() {
             let spawnRate = currentDiff === 'EASY' ? 0.01 : 0.02;
             let speedBase = currentDiff === 'EASY' ? 1.0 : 1.8;
-            
-            // 60초 이후 난이도 상승
-            if(score > 60) {
-                spawnRate *= 2.0;
-                speedBase *= 1.5;
-            }
-
+            if(score > 60) { spawnRate *= 2.0; speedBase *= 1.5; }
             if(this.enemies.length < (score > 60 ? 6 : 3) && Math.random() < spawnRate) {
                 this.enemies.push({x: OX + Math.random()*(GW/2 - 20) + 10, y: OY - 20, s: speedBase + Math.random()*1.0});
             }
@@ -170,16 +164,9 @@
         update() {
             if(keys['KeyA'] && this.px > OX + GW/2 + 15) this.px -= 3;
             if(keys['KeyD'] && this.px < OX + GW - 15) this.px += 3;
-            
             let spawnRate = currentDiff === 'EASY' ? 0.008 : 0.015;
             let speedBase = (currentDiff === 'EASY' ? 2.0 : 3.5) * 0.65;
-            
-            // 70초 이후 난이도 상승
-            if(score > 70) {
-                spawnRate *= 2.2;
-                speedBase *= 1.4;
-            }
-
+            if(score > 70) { spawnRate *= 2.2; speedBase *= 1.4; }
             if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: speedBase});
             this.balls.forEach(b => {
                 b.y += b.s;
@@ -202,35 +189,44 @@
         py: 0, v: 0, ground: true, obsX: 0,
         init() { this.py = OY + GH - 25; this.v = 0; this.ground = true; this.obsX = OX - 100; },
         update() {
-            if(keys['Space'] && this.ground) { this.v = -10.5; this.ground = false; }
-            this.v += 0.45; this.py += this.v;
+            // 점프 메커니즘 개선 (중력 하향 및 점프력 최적화)
+            if(keys['Space'] && this.ground) { this.v = -9.2; this.ground = false; }
+            this.v += 0.32; // 중력 더 낮춤 (부드러운 낙하)
+            this.py += this.v;
             if(this.py >= OY + GH - 25) { this.py = OY + GH - 25; this.v = 0; this.ground = true; }
             
             if(score > 22) { 
-                let moveSpeed = (currentDiff === 'EASY' ? 3.0 : 4.5);
+                // 장애물 오는 빈도 및 속도 최적화
+                let moveSpeed = (currentDiff === 'EASY' ? 2.8 : 4.0);
                 this.obsX += moveSpeed; 
-                if(this.obsX > OX + GW/2) this.obsX = OX - 20;
+                // 화면 오른쪽 끝까지 가지 않고 일정 거리 도달 시 왼쪽에서 재생성 (빈도 조절)
+                if(this.obsX > OX + GW/2 + 100) this.obsX = OX - 50;
             } else { this.obsX = OX - 50; }
             
             const playerX = OX + GW/2 - 80;
-            if(Math.abs(this.obsX - playerX) < 18 && this.py > OY + GH - 45) stopGame("AREA 3: 충돌!");
+            // 판정 크기 축소 (18 -> 14)
+            if(Math.abs(this.obsX - playerX) < 14 && this.py > OY + GH - 40) stopGame("AREA 3: 충돌!");
         },
         draw() {
-            // 80초~85초 사이 점점 검은색으로 변함
-            let bgAlpha = 0.05;
-            if(score >= 80) {
-                let darkness = Math.min(1, (score - 80) / 5);
-                ctx.fillStyle = `rgba(0, 0, 0, ${darkness})`;
-                ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
-                bgAlpha = 0.05 * (1 - darkness);
-            }
-            ctx.fillStyle = `rgba(0, 255, 0, ${bgAlpha})`;
+            let darkness = 0;
+            if(score >= 80) darkness = Math.min(1, (score - 80) / 5);
+            
+            // 구역 배경
+            ctx.fillStyle = `rgba(0, 255, 0, ${0.05 * (1 - darkness)})`;
             ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
-
-            ctx.fillStyle = '#0f0';
-            ctx.fillRect(OX + GW/2 - 90, this.py-20, 20, 20);
-            ctx.fillStyle = '#ff0';
-            ctx.fillRect(this.obsX, OY + GH - 40, 15, 40);
+            
+            // 암전 효과 (85초 이후에는 내부의 모든 것이 검정색이 됨)
+            if(darkness >= 1) {
+                ctx.fillStyle = "#000";
+                ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
+            } else {
+                // 캐릭터
+                ctx.fillStyle = `rgba(0, 255, 0, ${1 - darkness})`;
+                ctx.fillRect(OX + GW/2 - 90, this.py-20, 20, 20);
+                // 장애물
+                ctx.fillStyle = `rgba(255, 255, 0, ${1 - darkness})`;
+                ctx.fillRect(this.obsX, OY + GH - 40, 15, 40);
+            }
         }
     };
 
@@ -238,8 +234,7 @@
         g: 0,
         update() {
             let increase = (currentDiff === 'EASY' ? 0.15 : 0.30);
-            if(score > 90) increase *= 1.6; // 90초 이후 1.6배 가속
-            
+            if(score > 90) increase *= 1.6;
             this.g += increase;
             if(this.g >= 100) stopGame("AREA 4: 폭발!");
         },
@@ -282,7 +277,6 @@
         const rx = e.clientX - rect.left;
         const ry = e.clientY - rect.top;
         if(rx > GW/2 && ry > GH/2) {
-            // 90초 이후에는 감소량 절반 (25% -> 12.5%)
             let decrease = (score > 90) ? 12.5 : 25;
             area4.g = Math.max(0, area4.g - decrease);
         }
@@ -330,13 +324,11 @@
         score += 1/60;
         timerEl.innerText = score.toFixed(1);
 
-        // 구역별 스테이지 진입 알림 (2초 전)
         warnArea = 0;
         if(score >= 8 && score < 10) warnArea = 2;
         if(score >= 18 && score < 20) warnArea = 3;
         if(score >= 28 && score < 30) warnArea = 4;
 
-        // 구역별 Level Up 알림 (1초간 유지)
         levelUpArea = 0;
         if(score >= 60 && score < 61) levelUpArea = 1;
         if(score >= 70 && score < 71) levelUpArea = 2;
@@ -351,7 +343,6 @@
         if(stage >= 3) { area3.update(); area3.draw(); }
         if(stage >= 4) { area4.update(); area4.draw(); }
 
-        // 알림 메시지 출력
         if(warnArea === 2) drawInfo(2, "잠시 후 시작: A, D 이동");
         if(warnArea === 3) drawInfo(3, "잠시 후 시작: SPACE 점프");
         if(warnArea === 4) drawInfo(4, "잠시 후 시작: 클릭 해제");
