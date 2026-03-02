@@ -11,12 +11,9 @@
             --neon-pink: #f0f;
             --neon-green: #0f0;
             --neon-orange: #f80;
-            --gold: #ffd700;
-            --silver: #e0e0e0;
-            --bronze: #cd7f32;
         }
-        body { margin: 0; background-color: #000; font-family: 'Pretendard', sans-serif; color: white; overflow: hidden; scroll-behavior: smooth; }
-        .overlay { width: 100%; min-height: 100vh; background: rgba(0,0,0,0.94); display: flex; flex-direction: column; align-items: center; padding-top: 60px; position: relative; z-index: 100; }
+        body { margin: 0; background-color: #000; font-family: 'Pretendard', sans-serif; color: white; overflow: hidden; }
+        .overlay { width: 100%; min-height: 100vh; background: rgba(0,0,0,0.94); display: flex; flex-direction: column; align-items: center; padding-top: 60px; position: relative; z-index: 100; overflow-y: auto; }
         .hidden { display: none !important; }
         
         .btn { padding: 15px 40px; font-size: 20px; cursor: pointer; font-weight: bold; border: none; border-radius: 8px; transition: 0.2s; color: white; margin: 10px; outline: none; }
@@ -29,17 +26,13 @@
 
         table { width: 100%; border-collapse: collapse; text-align: center; font-size: 16px; }
         th, td { padding: 14px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        th { color: #888; font-size: 13px; text-transform: uppercase; }
-        .rank-1 { color: var(--gold); font-weight: bold; background: rgba(255, 215, 0, 0.05); }
+        .rank-1 { color: var(--primary-color); font-weight: bold; }
 
-        #game-ui { position: fixed; top: 25px; left: 25px; font-size: 26px; z-index: 200; display: none; text-shadow: 2px 2px 5px #000; font-weight: bold; color: var(--neon-mint); }
-        #countdown-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 130px; font-weight: bold; color: var(--primary-color); z-index: 300; display: none; }
-        #guide-msg { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; font-weight: bold; color: #fff; z-index: 250; text-align: center; pointer-events: none; text-shadow: 0 0 20px rgba(255,255,255,0.5); display: none; }
+        #game-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-size: 24px; z-index: 200; display: none; font-weight: bold; color: var(--neon-mint); text-align: center; width: 100%; }
+        #countdown-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; font-weight: bold; color: var(--primary-color); z-index: 300; display: none; }
+        #guide-msg { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: bold; color: #fff; z-index: 250; text-align: center; pointer-events: none; display: none; text-shadow: 0 0 10px rgba(0,0,0,1); }
         
         canvas { position: fixed; top: 0; left: 0; z-index: 10; display: none; cursor: none; }
-        
-        .content-section { max-width: 850px; width: 90%; margin: 60px 0; text-align: left; line-height: 2.0; color: #ccc; border-top: 1px solid #333; padding-top: 40px; }
-        .content-section h2 { color: var(--primary-color); border-left: 5px solid var(--primary-color); padding-left: 15px; margin: 50px 0 25px; font-size: 28px; }
         #version-tag { position: fixed; bottom: 12px; right: 18px; font-size: 14px; color: rgba(255, 255, 255, 0.3); z-index: 500; }
     </style>
 </head>
@@ -48,21 +41,16 @@
 <div id="countdown-text"></div>
 <div id="guide-msg"></div>
 <div id="game-ui">TIME: <span id="timer">0.0</span>s | STAGE: <span id="stage-val">1</span></div>
-<div id="version-tag">Ver 1.1.5</div>
+<div id="version-tag">Ver 1.1.6</div>
 
 <canvas id="gameCanvas"></canvas>
 
 <div id="main-menu" class="overlay">
-    <h1 style="color: var(--neon-mint); font-size: 56px; letter-spacing: 6px; margin-bottom: 10px; text-shadow: 0 0 20px var(--neon-mint);">NEON DODGE</h1>
-    <p style="color: #888; margin-bottom: 30px;">당신의 뇌 기능을 극한까지 분할하여 사용하세요.</p>
-    
+    <h1 style="color: var(--neon-mint); font-size: 48px; letter-spacing: 4px; margin-bottom: 10px; text-shadow: 0 0 15px var(--neon-mint);">NEON DODGE</h1>
     <div class="btn-group">
         <button class="btn" style="background:#2ecc71" onclick="runGame('EASY')">EASY MODE</button>
         <button class="btn" style="background:#e74c3c" onclick="runGame('HARD')">HARD MODE</button>
     </div>
-
-    <button class="btn" style="background:transparent; border: 2px solid #555; font-size: 16px; margin-top: 10px;" onclick="location.href='https://game-hub-steel-eight.vercel.app/'">← GAME HUB 돌아가기</button>
-
     <div id="ranking-container">
         <div class="tab-menu">
             <button class="tab-btn active" id="tab-EASY" onclick="loadRanking('EASY')">EASY RANK</button>
@@ -70,25 +58,14 @@
         </div>
         <div id="ranking-list">데이터 로딩 중...</div>
     </div>
-
-    <div class="content-section">
-        <h2>멀티태스킹 닷지: 인지 능력의 한계를 넘어서</h2>
-        <p>현대 게임 환경에서 멀티태스킹 능력은 필수적인 요소입니다. 단순히 하나에 집중하는 것을 넘어, 시각 정보의 분할 처리와 각기 다른 출력 장치의 독립적 제어는 게이머에게 정점의 실력을 부여합니다.</p>
-        <p>(...이하 생략 - 이전과 동일한 2000자 분량의 가이드 텍스트 자동 포함...)</p>
-    </div>
 </div>
 
 <div id="result-screen" class="overlay hidden">
     <h1 id="result-title">GAME OVER</h1>
-    <h2 id="final-stats" style="color: var(--primary-color); font-size: 32px;">버틴 시간: 0.0s</h2>
-    <input type="text" id="nickname" placeholder="닉네임 입력" maxlength="8" style="padding:15px; border-radius:8px; border:none; margin-bottom:15px; text-align:center; width:260px; color:#000; font-size: 18px;">
-    <div style="display: flex; flex-direction: column; align-items: center;">
-        <button class="btn" id="save-btn" style="background:var(--primary-color); color:#000;">기록 등록</button>
-        <div style="display: flex; gap: 10px;">
-            <button class="btn" style="background:#555;" onclick="location.reload()">다시 하기</button>
-            <button class="btn" style="background:#3498db;" onclick="location.href='https://game-hub-steel-eight.vercel.app/'">허브로 이동</button>
-        </div>
-    </div>
+    <h2 id="final-stats" style="color: var(--primary-color); font-size: 28px;">버틴 시간: 0.0s</h2>
+    <input type="text" id="nickname" placeholder="닉네임 입력" maxlength="8" style="padding:12px; border-radius:8px; border:none; margin-bottom:15px; text-align:center; width:240px; font-size: 18px;">
+    <button class="btn" id="save-btn" style="background:var(--primary-color); color:#000;">기록 등록</button>
+    <button class="btn" style="background:#555;" onclick="location.reload()">다시 하기</button>
 </div>
 
 <script type="module">
@@ -113,122 +90,127 @@
     const guideEl = document.getElementById('guide-msg');
 
     let gameActive = false, score = 0, stage = 1, currentDiff = 'EASY';
-    let p1 = { x: 0, y: 0 }; // Area 1 캐릭터 위치
-    let keys = {};
+    let p1 = { x: 0, y: 0 }, keys = {};
     let wheelClickTimer = 0, wheelScrollTimer = 0, wheelScrollGoal = '';
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    // 화면 레이아웃 설정 (중앙에 800x600 크기로 구역을 모음)
+    const GW = 800, GH = 600;
+    let OX, OY; // Offset X, Y
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        OX = (canvas.width - GW) / 2;
+        OY = (canvas.height - GH) / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
 
     window.loadRanking = async (diff) => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `tab-${diff}`));
         const listDiv = document.getElementById('ranking-list');
         listDiv.innerHTML = "로딩 중...";
         try {
+            // 복합 쿼리 오류 방지를 위해 score 정렬만 먼저 시도하거나, 에러 핸들링 강화
             const q = query(collection(db, "dodge_rankings"), where("diff", "==", diff), orderBy("score", "desc"), limit(5));
             const snap = await getDocs(q);
             let html = "<table><tr><th>순위</th><th>닉네임</th><th>시간</th></tr>";
             let rank = 1;
             snap.forEach(doc => {
                 const data = doc.data();
-                let rowClass = (rank === 1) ? "rank-1" : "";
-                html += `<tr class="${rowClass}"><td>${rank}</td><td>${data.name}</td><td>${data.score.toFixed(1)}s</td></tr>`;
+                html += `<tr class="${rank===1?'rank-1':''}"><td>${rank}</td><td>${data.name}</td><td>${data.score.toFixed(1)}s</td></tr>`;
                 rank++;
             });
             listDiv.innerHTML = (rank === 1) ? "기록 없음" : html + "</table>";
-        } catch(e) { listDiv.innerHTML = "로드 실패"; }
+        } catch(e) { 
+            console.error(e);
+            listDiv.innerHTML = "로드 실패 (인덱스 설정 필요)"; 
+        }
     };
     loadRanking('EASY');
 
     const area1 = {
         enemies: [],
         update() {
-            const spawnRate = currentDiff === 'EASY' ? 0.03 : 0.05;
-            const speedBase = currentDiff === 'EASY' ? 2 : 4;
-            if(Math.random() < spawnRate) this.enemies.push({x: Math.random()*(canvas.width/2 - 20) + 10, y: -20, s: speedBase + Math.random()*3});
+            const spawnRate = currentDiff === 'EASY' ? 0.02 : 0.04;
+            const speedBase = currentDiff === 'EASY' ? 1.5 : 3;
+            if(Math.random() < spawnRate) this.enemies.push({x: OX + Math.random()*(GW/2 - 20) + 10, y: OY - 20, s: speedBase + Math.random()*2});
             this.enemies.forEach(e => {
                 e.y += e.s;
-                // p1 캐릭터와의 충돌 체크
-                if(Math.hypot(p1.x - e.x, p1.y - e.y) < 25) stopGame("AREA 1: 충돌!");
+                if(Math.hypot(p1.x - e.x, p1.y - e.y) < 22) stopGame("AREA 1: 충돌!");
             });
-            this.enemies = this.enemies.filter(e => e.y < canvas.height/2);
+            this.enemies = this.enemies.filter(e => e.y < OY + GH/2);
         },
         draw() {
-            ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
-            ctx.fillRect(0, 0, canvas.width/2, canvas.height/2);
-            // 적 그리기
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.08)';
+            ctx.fillRect(OX, OY, GW/2, GH/2);
             ctx.fillStyle = '#0ff';
-            this.enemies.forEach(e => ctx.fillRect(e.x-10, e.y-10, 20, 20));
-            // 플레이어 캐릭터 그리기
-            ctx.shadowBlur = 15; ctx.shadowColor = '#0ff';
-            ctx.beginPath(); ctx.arc(p1.x, p1.y, 12, 0, Math.PI*2);
+            this.enemies.forEach(e => ctx.fillRect(e.x-8, e.y-8, 16, 16));
+            ctx.beginPath(); ctx.arc(p1.x, p1.y, 10, 0, Math.PI*2);
             ctx.fillStyle = '#0ff'; ctx.fill();
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#fff'; ctx.stroke();
         }
     };
 
     const area2 = {
         px: 0, balls: [],
-        init() { this.px = canvas.width * 0.75; },
+        init() { this.px = OX + GW * 0.75; },
         update() {
-            if(keys['KeyA'] && this.px > canvas.width/2 + 20) this.px -= 7;
-            if(keys['KeyD'] && this.px < canvas.width - 20) this.px += 7;
-            if(Math.random() < (currentDiff === 'EASY' ? 0.02 : 0.04)) this.balls.push({x: canvas.width/2 + Math.random()*(canvas.width/2 - 20), y: 0, s: 5});
+            if(keys['KeyA'] && this.px > OX + GW/2 + 15) this.px -= 5;
+            if(keys['KeyD'] && this.px < OX + GW - 15) this.px += 5;
+            const spawnRate = currentDiff === 'EASY' ? 0.015 : 0.03;
+            if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: 3.5});
             this.balls.forEach(b => {
                 b.y += b.s;
-                if(Math.abs(this.px - b.x) < 20 && Math.abs(canvas.height/2 - 30 - b.y) < 20) stopGame("AREA 2: 충돌!");
+                if(Math.abs(this.px - b.x) < 18 && Math.abs(OY + GH/2 - 30 - b.y) < 18) stopGame("AREA 2: 충돌!");
             });
-            this.balls = this.balls.filter(b => b.y < canvas.height/2);
+            this.balls = this.balls.filter(b => b.y < OY + GH/2);
         },
         draw() {
             ctx.fillStyle = 'rgba(255, 0, 255, 0.05)';
-            ctx.fillRect(canvas.width/2, 0, canvas.width/2, canvas.height/2);
+            ctx.fillRect(OX + GW/2, OY, GW/2, GH/2);
             ctx.fillStyle = '#f0f';
-            ctx.fillRect(this.px-15, canvas.height/2 - 40, 30, 30);
+            ctx.fillRect(this.px-12, OY + GH/2 - 35, 24, 24);
             this.balls.forEach(b => {
-                ctx.beginPath(); ctx.arc(b.x, b.y, 10, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, Math.PI*2); ctx.fill();
             });
         }
     };
 
     const area3 = {
         py: 0, v: 0, ground: true, obsX: 0,
-        init() { this.py = canvas.height - 30; this.obsX = canvas.width/2; },
+        init() { this.py = OY + GH - 25; this.obsX = OX + GW/2; },
         update() {
-            if(keys['Space'] && this.ground) { this.v = -15; this.ground = false; }
-            this.v += 0.8; this.py += this.v;
-            if(this.py >= canvas.height - 30) { this.py = canvas.height - 30; this.ground = true; }
-            this.obsX -= (currentDiff === 'EASY' ? 6 : 9);
-            if(this.obsX < 20) this.obsX = canvas.width/2 - 20;
-            if(Math.abs(this.obsX - 100) < 25 && this.py > canvas.height - 60) stopGame("AREA 3: 점프 실패!");
+            if(keys['Space'] && this.ground) { this.v = -13; this.ground = false; }
+            this.v += 0.7; this.py += this.v;
+            if(this.py >= OY + GH - 25) { this.py = OY + GH - 25; this.ground = true; }
+            this.obsX -= (currentDiff === 'EASY' ? 4.5 : 7);
+            if(this.obsX < OX + 10) this.obsX = OX + GW/2 - 10;
+            if(Math.abs(this.obsX - (OX + 80)) < 22 && this.py > OY + GH - 50) stopGame("AREA 3: 충돌!");
         },
         draw() {
             ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
-            ctx.fillRect(0, canvas.height/2, canvas.width/2, canvas.height/2);
+            ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
             ctx.fillStyle = '#0f0';
-            ctx.fillRect(85, this.py-30, 30, 30);
+            ctx.fillRect(OX + 70, this.py-25, 25, 25);
             ctx.fillStyle = '#ff0';
-            ctx.fillRect(this.obsX, canvas.height-50, 20, 50);
+            ctx.fillRect(this.obsX, OY + GH - 45, 15, 45);
         }
     };
 
     const area4 = {
         g: 0,
         update() {
-            this.g += (currentDiff === 'EASY' ? 0.25 : 0.4);
-            if(this.g >= 100) stopGame("AREA 4: 게이지 폭발!");
+            this.g += (currentDiff === 'EASY' ? 0.18 : 0.35);
+            if(this.g >= 100) stopGame("AREA 4: 폭발!");
         },
         draw() {
             ctx.fillStyle = 'rgba(255, 136, 0, 0.05)';
-            ctx.fillRect(canvas.width/2, canvas.height/2, canvas.width/2, canvas.height/2);
-            ctx.fillStyle = '#444';
-            const bx = canvas.width * 0.65, by = canvas.height * 0.75;
-            ctx.fillRect(bx, by, 200, 30);
+            ctx.fillRect(OX + GW/2, OY + GH/2, GW/2, GH/2);
+            const bx = OX + GW * 0.62, by = OY + GH * 0.75;
+            ctx.fillStyle = '#333'; ctx.fillRect(bx, by, 150, 25);
             ctx.fillStyle = this.g > 80 ? '#f00' : '#f80';
-            ctx.fillRect(bx, by, this.g * 2, 30);
-            ctx.font = "bold 16px Arial"; ctx.fillStyle = "#fff";
-            ctx.fillText("CLICK TO RESET", bx + 35, by - 15);
+            ctx.fillRect(bx, by, this.g * 1.5, 25);
         }
     };
 
@@ -238,59 +220,20 @@
         setTimeout(() => { guideEl.style.display = 'none'; }, 2000);
     }
 
-    function updateHardMissions() {
-        if(currentDiff !== 'HARD') return;
-        if(score > 10) { wheelClickTimer += 1/60; if(wheelClickTimer > 3) stopGame("HARD: 휠 클릭 실패!"); }
-        if(score > 20) {
-            if(!wheelScrollGoal) wheelScrollGoal = Math.random() > 0.5 ? 'UP' : 'DOWN';
-            wheelScrollTimer += 1/60; if(wheelScrollTimer > 5) stopGame("HARD: 휠 스크롤 실패!");
-        }
-    }
-
-    function drawHardUI() {
-        if(currentDiff !== 'HARD') return;
-        ctx.font = "bold 22px Arial"; ctx.textAlign = "center";
-        if(score > 10) {
-            ctx.fillStyle = wheelClickTimer > 2 ? '#f00' : '#fff';
-            ctx.fillText(`WHEEL CLICK! (${(3-wheelClickTimer).toFixed(1)}s)`, canvas.width*0.25, 40);
-        }
-        if(score > 20) {
-            ctx.fillStyle = wheelScrollTimer > 3 ? '#f00' : '#fff';
-            ctx.fillText(`SCROLL ${wheelScrollGoal}! (${(5-wheelScrollTimer).toFixed(1)}s)`, canvas.width*0.75, 40);
-        }
-    }
-
-    window.addEventListener('keydown', e => {
-        keys[e.code] = true;
-        if(e.code === 'Escape' && gameActive) stopGame("게임 중단");
-    });
+    window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'Escape' && gameActive) stopGame("중단"); });
     window.addEventListener('keyup', e => keys[e.code] = false);
-
-    // 마우스 이동 처리 (Pointer Lock 사용)
     window.addEventListener('mousemove', e => {
         if(!gameActive) return;
-        // Pointer Lock 시 movementX, movementY 사용
-        p1.x += e.movementX;
-        p1.y += e.movementY;
-        // Area 1 범위 내로 캐릭터 고정
-        p1.x = Math.max(15, Math.min(canvas.width/2 - 15, p1.x));
-        p1.y = Math.max(15, Math.min(canvas.height/2 - 15, p1.y));
+        p1.x += e.movementX; p1.y += e.movementY;
+        p1.x = Math.max(OX + 12, Math.min(OX + GW/2 - 12, p1.x));
+        p1.y = Math.max(OY + 12, Math.min(OY + GH/2 - 12, p1.y));
     });
-
     window.addEventListener('mousedown', e => {
         if(!gameActive) return;
-        const rect = canvas.getBoundingClientRect();
-        const realX = e.clientX - rect.left;
-        const realY = e.clientY - rect.top;
-        if(realX > canvas.width/2 && realY > canvas.height/2) area4.g = 0;
+        const rx = e.clientX, ry = e.clientY;
+        if(rx > OX + GW/2 && ry > OY + GH/2) area4.g = 0;
         if(currentDiff === 'HARD' && e.button === 1) wheelClickTimer = 0;
     });
-
-    window.addEventListener('wheel', e => {
-        if(!gameActive || currentDiff !== 'HARD') return;
-        if(e.deltaY < 0 && wheelScrollGoal === 'UP') { wheelScrollGoal = ''; wheelScrollTimer = 0; }
-        if(e.deltaY > 0 && wheelScrollGoal === 'DOWN') { wheelScrollGoal = ''; wheelScrollTimer = 0; }
-    }, {passive: false});
 
     window.runGame = (diff) => {
         currentDiff = diff;
@@ -298,36 +241,35 @@
         document.getElementById('countdown-text').style.display = 'block';
         let count = 3;
         const cd = setInterval(() => {
-            document.getElementById('countdown-text').innerText = count === 0 ? "GO!" : count;
+            document.getElementById('countdown-text').innerText = count <= 0 ? "GO!" : count;
             if(count < 0) {
                 clearInterval(cd);
                 document.getElementById('countdown-text').style.display = 'none';
-                canvas.requestPointerLock(); // 마우스 가두기
+                canvas.requestPointerLock();
                 startGame();
             }
             count--;
-        }, 1000);
+        }, 800);
     };
 
     function startGame() {
         gameActive = true; score = 0; stage = 1;
-        p1 = { x: canvas.width/4, y: canvas.height/4 };
+        p1 = { x: OX + GW/4, y: OY + GH/4 };
         area1.enemies = []; area2.init(); area3.init(); area4.g = 0;
-        wheelClickTimer = 0; wheelScrollTimer = 0; wheelScrollGoal = '';
         canvas.style.display = 'block';
         document.getElementById('game-ui').style.display = 'block';
-        showGuide("Area 1: 마우스로 블록을 피하세요!");
+        showGuide("Area 1: 마우스로 회피!");
         animate();
     }
 
     function stopGame(reason) {
         if(!gameActive) return;
         gameActive = false;
-        document.exitPointerLock(); // 마우스 해제
+        document.exitPointerLock();
         canvas.style.display = 'none';
         document.getElementById('game-ui').style.display = 'none';
         document.getElementById('result-screen').classList.remove('hidden');
-        document.getElementById('final-stats').innerText = `버틴 시간: ${score.toFixed(1)}s (${reason})`;
+        document.getElementById('final-stats').innerText = `시간: ${score.toFixed(1)}s (${reason})`;
     }
 
     function animate() {
@@ -336,13 +278,12 @@
         score += 1/60;
         timerEl.innerText = score.toFixed(1);
 
-        // 스테이지 전환 및 안내 메시지
-        const prevStage = stage;
+        const ps = stage;
         if(score > 30) stage = 4; else if(score > 20) stage = 3; else if(score > 10) stage = 2;
-        if(stage !== prevStage) {
-            if(stage === 2) showGuide("Area 2: A, D 키로 공을 피하세요!");
-            if(stage === 3) showGuide("Area 3: SPACE 키로 장애물을 넘으세요!");
-            if(stage === 4) showGuide("Area 4: 클릭으로 게이지를 낮추세요!");
+        if(stage !== ps) {
+            if(stage === 2) showGuide("Area 2: A, D로 이동!");
+            if(stage === 3) showGuide("Area 3: SPACE로 점프!");
+            if(stage === 4) showGuide("Area 4: 클릭으로 게이지 관리!");
         }
         stageValEl.innerText = stage;
 
@@ -351,27 +292,22 @@
         if(stage >= 3) { area3.update(); area3.draw(); }
         if(stage >= 4) { area4.update(); area4.draw(); }
 
-        updateHardMissions();
-        drawHardUI();
-
-        // 중앙 분할선
-        ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(canvas.width/2, 0); ctx.lineTo(canvas.width/2, canvas.height); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2); ctx.stroke();
+        ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
+        ctx.strokeRect(OX, OY, GW, GH);
+        ctx.beginPath(); ctx.moveTo(OX + GW/2, OY); ctx.lineTo(OX + GW/2, OY + GH); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(OX, OY + GH/2); ctx.lineTo(OX + GW, OY + GH/2); ctx.stroke();
 
         requestAnimationFrame(animate);
     }
 
     document.getElementById('save-btn').onclick = async () => {
         const nick = document.getElementById('nickname').value.trim() || "익명";
-        const btn = document.getElementById('save-btn');
-        btn.disabled = true;
         try {
             await addDoc(collection(db, "dodge_rankings"), {
                 diff: currentDiff, name: nick, score: score, timestamp: serverTimestamp()
             });
             location.reload();
-        } catch (e) { alert("저장 실패"); btn.disabled = false; }
+        } catch (e) { alert("저장 실패"); }
     };
 </script>
 </body>
