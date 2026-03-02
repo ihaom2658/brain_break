@@ -12,8 +12,8 @@
             --neon-green: #0f0;
             --neon-orange: #f80;
         }
-        body { margin: 0; background-color: #000; font-family: 'Pretendard', sans-serif; color: white; overflow: hidden; }
-        .overlay { width: 100%; min-height: 100vh; background: rgba(0,0,0,0.94); display: flex; flex-direction: column; align-items: center; padding-top: 60px; position: relative; z-index: 100; overflow-y: auto; }
+        body { margin: 0; background-color: #000; font-family: 'Pretendard', sans-serif; color: white; overflow-x: hidden; }
+        .overlay { width: 100%; min-height: 100vh; background: rgba(0,0,0,0.94); display: flex; flex-direction: column; align-items: center; padding-top: 60px; position: relative; z-index: 100; }
         .hidden { display: none !important; }
         
         .btn { padding: 15px 40px; font-size: 20px; cursor: pointer; font-weight: bold; border: none; border-radius: 8px; transition: 0.2s; color: white; margin: 10px; outline: none; }
@@ -30,18 +30,23 @@
 
         #game-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-size: 24px; z-index: 200; display: none; font-weight: bold; color: var(--neon-mint); text-align: center; width: 100%; }
         #countdown-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; font-weight: bold; color: var(--primary-color); z-index: 300; display: none; }
-        #guide-msg { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: bold; color: #fff; z-index: 250; text-align: center; pointer-events: none; display: none; text-shadow: 0 0 10px rgba(0,0,0,1); }
+        #guide-msg { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: bold; color: #fff; z-index: 250; text-align: center; pointer-events: none; display: none; text-shadow: 0 0 15px rgba(0,0,0,1); }
+        #warning-msg { position: fixed; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 42px; font-weight: bold; color: var(--primary-color); z-index: 240; text-align: center; pointer-events: none; display: none; text-shadow: 0 0 20px rgba(241, 196, 15, 0.5); }
         
         canvas { position: fixed; top: 0; left: 0; z-index: 10; display: none; cursor: none; }
         #version-tag { position: fixed; bottom: 12px; right: 18px; font-size: 14px; color: rgba(255, 255, 255, 0.3); z-index: 500; }
+
+        .content-section { max-width: 850px; width: 90%; margin: 60px 0; text-align: left; line-height: 2.0; color: #ccc; border-top: 1px solid #333; padding-top: 40px; }
+        .content-section h2 { color: var(--primary-color); border-left: 5px solid var(--primary-color); padding-left: 15px; margin: 50px 0 25px; font-size: 28px; }
     </style>
 </head>
 <body>
 
 <div id="countdown-text"></div>
 <div id="guide-msg"></div>
+<div id="warning-msg"></div>
 <div id="game-ui">TIME: <span id="timer">0.0</span>s | STAGE: <span id="stage-val">1</span></div>
-<div id="version-tag">Ver 1.1.6</div>
+<div id="version-tag">Ver 1.1.7</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -51,12 +56,27 @@
         <button class="btn" style="background:#2ecc71" onclick="runGame('EASY')">EASY MODE</button>
         <button class="btn" style="background:#e74c3c" onclick="runGame('HARD')">HARD MODE</button>
     </div>
+    
     <div id="ranking-container">
         <div class="tab-menu">
             <button class="tab-btn active" id="tab-EASY" onclick="loadRanking('EASY')">EASY RANK</button>
             <button class="tab-btn" id="tab-HARD" onclick="loadRanking('HARD')">HARD RANK</button>
         </div>
         <div id="ranking-list">데이터 로딩 중...</div>
+    </div>
+
+    <div class="content-section">
+        <h2>멀티태스킹 닷지: 인지 능력의 한계를 넘어서</h2>
+        <p>현대 게임 환경에서 멀티태스킹 능력은 필수적인 요소입니다. 단순히 하나에 집중하는 것을 넘어, 시각 정보의 분할 처리와 각기 다른 출력 장치의 독립적 제어는 게이머에게 정점의 실력을 부여합니다. NEON DODGE는 이러한 뇌의 처리 메커니즘을 극한으로 끌어올리기 위해 설계되었습니다.</p>
+        
+        <h2>구역별 미션 가이드</h2>
+        <p><strong>Area 1 (Top-Left):</strong> 정밀한 마우스 컨트롤이 요구됩니다. 쏟아지는 네온 블록 사이를 최소한의 움직임으로 통과하세요. 이 구역은 당신의 눈과 손의 협응력을 담당합니다.</p>
+        <p><strong>Area 2 (Top-Right):</strong> 키보드 A, D 키를 이용한 좌우 회피 구역입니다. 마우스로 1구역을 피하는 동시에 왼손으로는 리듬감 있게 낙하물을 피해야 합니다.</p>
+        <p><strong>Area 3 (Bottom-Left):</strong> 타이밍 기반의 점프 액션 구역입니다. 스페이스 바를 사용하여 장애물을 넘으세요. 일정한 속도로 다가오는 장애물은 당신의 주변시 능력을 테스트합니다.</p>
+        <p><strong>Area 4 (Bottom-Right):</strong> 클릭 기반의 리소스 관리 구역입니다. 자동으로 차오르는 게이지가 폭발하지 않도록 주기적으로 해당 구역을 클릭하여 초기화해야 합니다.</p>
+
+        <h2>고급 전략: 주변시와 분할 뇌</h2>
+        <p>숙련된 플레이어는 화면의 중앙 분할선을 응시합니다. 한 구역에 시선을 고정하는 순간 다른 구역의 정보를 놓치게 됩니다. 전체 화면을 하나의 패턴으로 인식하고, 각 입력 장치를 독립적인 스레드로 처리하는 '뇌의 병렬화'를 경험해 보십시오. 스테이지가 올라갈수록 이 능력은 생존의 유일한 열쇠가 됩니다.</p>
     </div>
 </div>
 
@@ -88,14 +108,14 @@
     const timerEl = document.getElementById('timer');
     const stageValEl = document.getElementById('stage-val');
     const guideEl = document.getElementById('guide-msg');
+    const warningEl = document.getElementById('warning-msg');
 
     let gameActive = false, score = 0, stage = 1, currentDiff = 'EASY';
     let p1 = { x: 0, y: 0 }, keys = {};
-    let wheelClickTimer = 0, wheelScrollTimer = 0, wheelScrollGoal = '';
+    let warnFlags = { s2: false, s3: false, s4: false };
 
-    // 화면 레이아웃 설정 (중앙에 800x600 크기로 구역을 모음)
     const GW = 800, GH = 600;
-    let OX, OY; // Offset X, Y
+    let OX, OY;
 
     function resize() {
         canvas.width = window.innerWidth;
@@ -111,7 +131,6 @@
         const listDiv = document.getElementById('ranking-list');
         listDiv.innerHTML = "로딩 중...";
         try {
-            // 복합 쿼리 오류 방지를 위해 score 정렬만 먼저 시도하거나, 에러 핸들링 강화
             const q = query(collection(db, "dodge_rankings"), where("diff", "==", diff), orderBy("score", "desc"), limit(5));
             const snap = await getDocs(q);
             let html = "<table><tr><th>순위</th><th>닉네임</th><th>시간</th></tr>";
@@ -217,7 +236,13 @@
     function showGuide(text) {
         guideEl.innerText = text;
         guideEl.style.display = 'block';
-        setTimeout(() => { guideEl.style.display = 'none'; }, 2000);
+        setTimeout(() => { guideEl.style.display = 'none'; }, 2500);
+    }
+
+    function showWarning(stageNum) {
+        warningEl.innerText = `준비하세요! 잠시 후 AREA ${stageNum} 오픈`;
+        warningEl.style.display = 'block';
+        setTimeout(() => { warningEl.style.display = 'none'; }, 2000);
     }
 
     window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'Escape' && gameActive) stopGame("중단"); });
@@ -232,7 +257,6 @@
         if(!gameActive) return;
         const rx = e.clientX, ry = e.clientY;
         if(rx > OX + GW/2 && ry > OY + GH/2) area4.g = 0;
-        if(currentDiff === 'HARD' && e.button === 1) wheelClickTimer = 0;
     });
 
     window.runGame = (diff) => {
@@ -256,6 +280,7 @@
         gameActive = true; score = 0; stage = 1;
         p1 = { x: OX + GW/4, y: OY + GH/4 };
         area1.enemies = []; area2.init(); area3.init(); area4.g = 0;
+        warnFlags = { s2: false, s3: false, s4: false };
         canvas.style.display = 'block';
         document.getElementById('game-ui').style.display = 'block';
         showGuide("Area 1: 마우스로 회피!");
@@ -270,6 +295,7 @@
         document.getElementById('game-ui').style.display = 'none';
         document.getElementById('result-screen').classList.remove('hidden');
         document.getElementById('final-stats').innerText = `시간: ${score.toFixed(1)}s (${reason})`;
+        warningEl.style.display = 'none';
     }
 
     function animate() {
@@ -277,6 +303,11 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         score += 1/60;
         timerEl.innerText = score.toFixed(1);
+
+        // 사전 경고 체크 (각 단계 2초 전)
+        if(score >= 8 && score < 10 && !warnFlags.s2) { showWarning(2); warnFlags.s2 = true; }
+        if(score >= 18 && score < 20 && !warnFlags.s3) { showWarning(3); warnFlags.s3 = true; }
+        if(score >= 28 && score < 30 && !warnFlags.s4) { showWarning(4); warnFlags.s4 = true; }
 
         const ps = stage;
         if(score > 30) stage = 4; else if(score > 20) stage = 3; else if(score > 10) stage = 2;
