@@ -44,7 +44,7 @@
 <div id="countdown-text"></div>
 <div id="guide-msg"></div>
 <div id="game-ui">TIME: <span id="timer">0.0</span>s | STAGE: <span id="stage-val">1</span></div>
-<div id="version-tag">Ver 1.1.8</div>
+<div id="version-tag">Ver 1.1.9</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -148,12 +148,14 @@
     const area1 = {
         enemies: [],
         update() {
-            const spawnRate = currentDiff === 'EASY' ? 0.015 : 0.03; // 탄막 빈도 하향
-            const speedBase = currentDiff === 'EASY' ? 1.2 : 2.5; // 속도 소폭 하향
-            if(Math.random() < spawnRate) this.enemies.push({x: OX + Math.random()*(GW/2 - 20) + 10, y: OY - 20, s: speedBase + Math.random()*1.5});
+            const spawnRate = currentDiff === 'EASY' ? 0.01 : 0.02; // 생성 확률 추가 하향
+            const speedBase = currentDiff === 'EASY' ? 1.0 : 1.8; // 속도 하향
+            // 동시에 최대 3개까지만 존재하도록 제한
+            if(this.enemies.length < 3 && Math.random() < spawnRate) {
+                this.enemies.push({x: OX + Math.random()*(GW/2 - 20) + 10, y: OY - 20, s: speedBase + Math.random()*1.0});
+            }
             this.enemies.forEach(e => {
                 e.y += e.s;
-                // 판정 완화: 히트박스 22 -> 16
                 if(Math.hypot(p1.x - e.x, p1.y - e.y) < 16) stopGame("AREA 1: 충돌!");
             });
             this.enemies = this.enemies.filter(e => e.y < OY + GH/2);
@@ -162,8 +164,8 @@
             ctx.fillStyle = 'rgba(0, 255, 255, 0.08)';
             ctx.fillRect(OX, OY, GW/2, GH/2);
             ctx.fillStyle = '#0ff';
-            this.enemies.forEach(e => ctx.fillRect(e.x-6, e.y-6, 12, 12)); // 크기 축소
-            ctx.beginPath(); ctx.arc(p1.x, p1.y, 8, 0, Math.PI*2); // 플레이어 축소
+            this.enemies.forEach(e => ctx.fillRect(e.x-6, e.y-6, 12, 12));
+            ctx.beginPath(); ctx.arc(p1.x, p1.y, 8, 0, Math.PI*2);
             ctx.fillStyle = '#0ff'; ctx.fill();
             ctx.strokeStyle = '#fff'; ctx.stroke();
         }
@@ -173,14 +175,14 @@
         px: 0, balls: [],
         init() { this.px = OX + GW * 0.75; },
         update() {
-            if(keys['KeyA'] && this.px > OX + GW/2 + 15) this.px -= 5;
-            if(keys['KeyD'] && this.px < OX + GW - 15) this.px += 5;
-            const spawnRate = currentDiff === 'EASY' ? 0.012 : 0.025; // 탄막 빈도 하향
-            const speedBase = (currentDiff === 'EASY' ? 3.5 : 5.0) * 0.65; // 속도 0.65배 적용
+            // 이동 속도 하향 (5 -> 3)
+            if(keys['KeyA'] && this.px > OX + GW/2 + 15) this.px -= 3;
+            if(keys['KeyD'] && this.px < OX + GW - 15) this.px += 3;
+            const spawnRate = currentDiff === 'EASY' ? 0.008 : 0.015; // 탄막 양 대폭 하향
+            const speedBase = (currentDiff === 'EASY' ? 2.0 : 3.5) * 0.65; // 낙하 속도 하향
             if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: speedBase});
             this.balls.forEach(b => {
                 b.y += b.s;
-                // 판정 완화
                 if(Math.abs(this.px - b.x) < 14 && Math.abs(OY + GH/2 - 30 - b.y) < 14) stopGame("AREA 2: 충돌!");
             });
             this.balls = this.balls.filter(b => b.y < OY + GH/2);
@@ -189,7 +191,7 @@
             ctx.fillStyle = 'rgba(255, 0, 255, 0.05)';
             ctx.fillRect(OX + GW/2, OY, GW/2, GH/2);
             ctx.fillStyle = '#f0f';
-            ctx.fillRect(this.px-10, OY + GH/2 - 35, 20, 20); // 크기 축소
+            ctx.fillRect(this.px-10, OY + GH/2 - 35, 20, 20);
             this.balls.forEach(b => {
                 ctx.beginPath(); ctx.arc(b.x, b.y, 7, 0, Math.PI*2); ctx.fill();
             });
@@ -198,15 +200,19 @@
 
     const area3 = {
         py: 0, v: 0, ground: true, obsX: 0,
-        init() { this.py = OY + GH - 25; this.obsX = OX - 100; }, // 화면 밖에서 시작하여 지연 효과
+        init() { this.py = OY + GH - 25; this.obsX = OX - 500; }, // 더 멀리서 시작하여 2초 이상의 여유 부여
         update() {
             if(keys['Space'] && this.ground) { this.v = -12; this.ground = false; }
             this.v += 0.65; this.py += this.v;
             if(this.py >= OY + GH - 25) { this.py = OY + GH - 25; this.ground = true; }
             
-            // 3구역 활성화 직후가 아니면 이동
-            this.obsX -= (currentDiff === 'EASY' ? 4.0 : 6.0);
-            if(this.obsX < OX - 20) this.obsX = OX + GW/2 - 10;
+            // 3구역 활성화 후 일정 시간(score 20초)이 지나야 장애물 이동 시작
+            if(score > 22) { // 20초 진입 후 2초 대기
+                this.obsX -= (currentDiff === 'EASY' ? 4.0 : 6.0);
+                if(this.obsX < OX - 20) this.obsX = OX + GW/2 - 10;
+            } else {
+                this.obsX = OX - 100; // 대기 중에는 화면 밖 대기
+            }
             
             if(Math.abs(this.obsX - (OX + 80)) < 18 && this.py > OY + GH - 45) stopGame("AREA 3: 충돌!");
         },
@@ -214,16 +220,16 @@
             ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
             ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
             ctx.fillStyle = '#0f0';
-            ctx.fillRect(OX + 70, this.py-20, 20, 20); // 캐릭터 축소
+            ctx.fillRect(OX + 70, this.py-20, 20, 20);
             ctx.fillStyle = '#ff0';
-            ctx.fillRect(this.obsX, OY + GH - 40, 12, 40); // 장애물 축소
+            ctx.fillRect(this.obsX, OY + GH - 40, 12, 40);
         }
     };
 
     const area4 = {
         g: 0,
         update() {
-            this.g += (currentDiff === 'EASY' ? 0.15 : 0.30); // 게이지 속도 하향
+            this.g += (currentDiff === 'EASY' ? 0.15 : 0.30);
             if(this.g >= 100) stopGame("AREA 4: 폭발!");
         },
         draw() {
