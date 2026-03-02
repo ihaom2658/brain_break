@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Multitasking Dodge - Neon Edition</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        canvas {
+            border: 2px solid #333;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            cursor: crosshair;
+        }
+        .ui {
+            margin-top: 10px;
+            text-align: center;
+        }
+        #score { font-size: 24px; color: #0ff; }
+    </style>
+</head>
+<body>
+
+    <div class="ui">
+        <div id="score">TIME: 0.0s</div>
+        <div id="msg">1단계: 마우스로 사각형을 피하세요!</div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const msgElement = document.getElementById('msg');
+
+        // 설정
+        canvas.width = 800;
+        canvas.height = 600;
+        let score = 0;
+        let gameState = 'START'; // START, PLAY, GAMEOVER
+        let stage = 1;
+
+        // 조작 상태
+        const keys = {};
+        let mousePos = { x: 0, y: 0 };
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
+        });
+        canvas.addEventListener('mousedown', () => {
+            if(gameState === 'GAMEOVER') resetGame();
+            if(stage >= 4) area4.click();
+        });
+
+        // --- Area 클래스 정의 ---
+
+        // Area 1: 마우스 회피 (Top-Left)
+        const area1 = {
+            enemies: [],
+            update() {
+                if(Math.random() < 0.05) {
+                    this.enemies.push({x: Math.random()*400, y: -20, speed: 2+Math.random()*3});
+                }
+                this.enemies.forEach((e, i) => {
+                    e.y += e.speed;
+                    // 충돌 체크
+                    let dx = mousePos.x - e.x;
+                    let dy = mousePos.y - e.y;
+                    if(Math.sqrt(dx*dx + dy*dy) < 15) gameOver("AREA 1: 충돌!");
+                });
+                this.enemies = this.enemies.filter(e => e.y < 300);
+            },
+            draw(w, h) {
+                ctx.strokeStyle = '#0ff';
+                ctx.strokeRect(5, 5, w-10, h-10);
+                ctx.fillStyle = '#0ff';
+                this.enemies.forEach(e => ctx.fillRect(e.x-10, e.y-10, 20, 20));
+                // 플레이어 커서 가이드
+                ctx.beginPath();
+                ctx.arc(mousePos.x, mousePos.y, 5, 0, Math.PI*2);
+                ctx.fill();
+            }
+        };
+
+        // Area 2: 키보드 회피 (Top-Right)
+        const area2 = {
+            playerX: 600,
+            balls: [],
+            update() {
+                if(keys['KeyA'] && this.playerX > 410) this.playerX -= 5;
+                if(keys['KeyD'] && this.playerX < 790) this.playerX += 5;
+                if(Math.random() < 0.03) {
+                    this.balls.push({x: 400 + Math.random()*400, y: 0, speed: 4});
+                }
+                this.balls.forEach(b => {
+                    b.y += b.speed;
+                    if(Math.abs(this.playerX - b.x) < 15 && Math.abs(280 - b.y) < 15) gameOver("AREA 2: 충돌!");
+                });
+                this.balls = this.balls.filter(b => b.y < 300);
+            },
+            draw(w, h) {
+                ctx.strokeStyle = '#f0f';
+                ctx.strokeRect(405, 5, w-10, h-10);
+                ctx.fillStyle = '#f0f';
+                ctx.fillRect(this.playerX-10, 270, 20, 20);
+                this.balls.forEach(b => {
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, 8, 0, Math.PI*2);
+                    ctx.fill();
+                });
+            }
+        };
+
+        // Area 3: 점프 (Bottom-Left)
+        const area3 = {
+            y: 580, v: 0, grounded: true,
+            obstacleX: 400,
+            update() {
+                if(keys['Space'] && this.grounded) { this.v = -12; this.grounded = false; }
+                this.v += 0.6; // 중력
+                this.y += this.v;
+                if(this.y >= 580) { this.y = 580; this.grounded = true; }
+                
+                this.obstacleX -= 5;
+                if(this.obstacleX < 0) this.obstacleX = 380;
+                
+                if(Math.abs(this.obstacleX - 100) < 20 && this.y > 560) gameOver("AREA 3: 점프 실패!");
+            },
+            draw(w, h) {
+                ctx.strokeStyle = '#0f0';
+                ctx.strokeRect(5, 305, w-10, h-10);
+                ctx.fillStyle = '#0f0';
+                ctx.fillRect(100, this.y-20, 20, 20); // 플레이어
+                ctx.fillStyle = '#ff0';
+                ctx.fillRect(this.obstacleX, 570, 15, 30); // 장애물
+            }
+        };
+
+        // Area 4: 클릭 게이지 (Bottom-Right)
+        const area4 = {
+            gauge: 0,
+            click() { this.gauge = Math.max(0, this.gauge - 10); },
+            update() {
+                this.gauge += 0.3;
+                if(this.gauge >= 100) gameOver("AREA 4: 게이지 폭발!");
+            },
+            draw(w, h) {
+                ctx.strokeStyle = '#f80';
+                ctx.strokeRect(405, 305, w-10, h-10);
+                ctx.fillStyle = '#444';
+                ctx.fillRect(500, 450, 200, 30);
+                ctx.fillStyle = this.gauge > 80 ? '#f00' : '#f80';
+                ctx.fillRect(500, 450, this.gauge * 2, 30);
+                ctx.font = "14px Arial";
+                ctx.fillText("CLICK TO LOWER!", 540, 440);
+            }
+        };
+
+        function gameOver(reason) {
+            gameState = 'GAMEOVER';
+            msgElement.innerText = reason + " (클릭하여 재시작)";
+        }
+
+        function resetGame() {
+            score = 0; stage = 1;
+            area1.enemies = []; area2.balls = []; area3.obstacleX = 400; area4.gauge = 0;
+            gameState = 'PLAY';
+        }
+
+        function update() {
+            if(gameState !== 'PLAY') return;
+
+            score += 1/60;
+            scoreElement.innerText = `TIME: ${score.toFixed(1)}s`;
+
+            // 스테이지 변경 로직
+            if(score > 30) { stage = 4; msgElement.innerText = "최종 단계: 모든 곳을 주시하세요!"; }
+            else if(score > 20) { stage = 3; msgElement.innerText = "3단계: 스페이스바로 점프!"; }
+            else if(score > 10) { stage = 2; msgElement.innerText = "2단계: AD 키로 공을 피하세요!"; }
+
+            area1.update();
+            if(stage >= 2) area2.update();
+            if(stage >= 3) area3.update();
+            if(stage >= 4) area4.update();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 화면 분할 선
+            ctx.strokeStyle = '#333';
+            ctx.beginPath();
+            ctx.moveTo(400, 0); ctx.lineTo(400, 600);
+            ctx.moveTo(0, 300); ctx.lineTo(800, 300);
+            ctx.stroke();
+
+            // 각 영역 그리기
+            area1.draw(400, 300);
+            if(stage >= 2) area2.draw(400, 300);
+            if(stage >= 3) area3.draw(400, 300);
+            if(stage >= 4) area4.draw(400, 300);
+
+            if(gameState === 'GAMEOVER') {
+                ctx.fillStyle = "rgba(0,0,0,0.7)";
+                ctx.fillRect(0,0,800,600);
+                ctx.fillStyle = "#fff";
+                ctx.font = "40px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("GAME OVER", 400, 300);
+            }
+            
+            requestAnimationFrame(() => {
+                update();
+                draw();
+            });
+        }
+
+        resetGame();
+        draw();
+    </script>
+</body>
+</html>
