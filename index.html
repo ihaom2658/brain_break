@@ -44,7 +44,7 @@
 <div id="countdown-text"></div>
 <div id="guide-msg"></div>
 <div id="game-ui">TIME: <span id="timer">0.0</span>s | STAGE: <span id="stage-val">1</span></div>
-<div id="version-tag">Ver 1.1.9</div>
+<div id="version-tag">Ver 1.2.0</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -70,7 +70,7 @@
         <h2>구역별 미션 가이드</h2>
         <p><strong>Area 1 (Top-Left):</strong> 정밀한 마우스 컨트롤이 요구됩니다. 쏟아지는 네온 블록 사이를 최소한의 움직임으로 통과하세요. 이 구역은 당신의 눈과 손의 협응력을 담당합니다.</p>
         <p><strong>Area 2 (Top-Right):</strong> 키보드 A, D 키를 이용한 좌우 회피 구역입니다. 마우스로 1구역을 피하는 동시에 왼손으로는 리듬감 있게 낙하물을 피해야 합니다.</p>
-        <p><strong>Area 3 (Bottom-Left):</strong> 타이밍 기반의 점프 액션 구역입니다. 스페이스 바를 사용하여 장애물을 넘으세요. 일정한 속도로 다가오는 장애물은 당신의 주변시 능력을 테스트합니다.</p>
+        <p><strong>Area 3 (Bottom-Left):</strong> 타이밍 기반의 점프 액션 구역입니다. 스페이스 바를 사용하여 장애물을 넘으세요. 캐릭터가 오른쪽에 위치하며 왼쪽에서 다가오는 벽을 피해야 합니다.</p>
         <p><strong>Area 4 (Bottom-Right):</strong> 클릭 기반의 리소스 관리 구역입니다. 자동으로 차오르는 게이지가 폭발하지 않도록 주기적으로 해당 구역을 클릭하여 초기화해야 합니다.</p>
 
         <h2>고급 전략: 주변시와 분할 뇌</h2>
@@ -105,11 +105,10 @@
     const ctx = canvas.getContext('2d');
     const timerEl = document.getElementById('timer');
     const stageValEl = document.getElementById('stage-val');
-    const guideEl = document.getElementById('guide-msg');
 
     let gameActive = false, score = 0, stage = 1, currentDiff = 'EASY';
     let p1 = { x: 0, y: 0 }, keys = {};
-    let warnArea = 0; // 0: none, 2, 3, 4
+    let warnArea = 0;
 
     const GW = 800, GH = 600;
     let OX, OY;
@@ -140,7 +139,7 @@
             listDiv.innerHTML = (rank === 1) ? "기록 없음" : html + "</table>";
         } catch(e) { 
             console.error(e);
-            listDiv.innerHTML = "로드 실패 (인덱스 설정 필요)"; 
+            listDiv.innerHTML = "로드 실패"; 
         }
     };
     loadRanking('EASY');
@@ -148,9 +147,8 @@
     const area1 = {
         enemies: [],
         update() {
-            const spawnRate = currentDiff === 'EASY' ? 0.01 : 0.02; // 생성 확률 추가 하향
-            const speedBase = currentDiff === 'EASY' ? 1.0 : 1.8; // 속도 하향
-            // 동시에 최대 3개까지만 존재하도록 제한
+            const spawnRate = currentDiff === 'EASY' ? 0.01 : 0.02;
+            const speedBase = currentDiff === 'EASY' ? 1.0 : 1.8;
             if(this.enemies.length < 3 && Math.random() < spawnRate) {
                 this.enemies.push({x: OX + Math.random()*(GW/2 - 20) + 10, y: OY - 20, s: speedBase + Math.random()*1.0});
             }
@@ -173,13 +171,12 @@
 
     const area2 = {
         px: 0, balls: [],
-        init() { this.px = OX + GW * 0.75; },
+        init() { this.px = OX + GW * 0.75; this.balls = []; },
         update() {
-            // 이동 속도 하향 (5 -> 3)
             if(keys['KeyA'] && this.px > OX + GW/2 + 15) this.px -= 3;
             if(keys['KeyD'] && this.px < OX + GW - 15) this.px += 3;
-            const spawnRate = currentDiff === 'EASY' ? 0.008 : 0.015; // 탄막 양 대폭 하향
-            const speedBase = (currentDiff === 'EASY' ? 2.0 : 3.5) * 0.65; // 낙하 속도 하향
+            const spawnRate = currentDiff === 'EASY' ? 0.008 : 0.015;
+            const speedBase = (currentDiff === 'EASY' ? 2.0 : 3.5) * 0.65;
             if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: speedBase});
             this.balls.forEach(b => {
                 b.y += b.s;
@@ -200,29 +197,48 @@
 
     const area3 = {
         py: 0, v: 0, ground: true, obsX: 0,
-        init() { this.py = OY + GH - 25; this.obsX = OX - 500; }, // 더 멀리서 시작하여 2초 이상의 여유 부여
+        init() { 
+            this.py = OY + GH - 25; 
+            this.v = 0;
+            this.ground = true;
+            this.obsX = OX - 100; // 초기 화면 밖 왼쪽 위치
+        },
         update() {
-            if(keys['Space'] && this.ground) { this.v = -12; this.ground = false; }
-            this.v += 0.65; this.py += this.v;
-            if(this.py >= OY + GH - 25) { this.py = OY + GH - 25; this.ground = true; }
+            // 점프 메커니즘 개선 (더 부드러운 중력 적용)
+            if(keys['Space'] && this.ground) { 
+                this.v = -10.5; // 점프력 살짝 하향
+                this.ground = false; 
+            }
+            this.v += 0.45; // 중력 대폭 하향하여 부드럽게 낙하
+            this.py += this.v;
             
-            // 3구역 활성화 후 일정 시간(score 20초)이 지나야 장애물 이동 시작
-            if(score > 22) { // 20초 진입 후 2초 대기
-                this.obsX -= (currentDiff === 'EASY' ? 4.0 : 6.0);
-                if(this.obsX < OX - 20) this.obsX = OX + GW/2 - 10;
-            } else {
-                this.obsX = OX - 100; // 대기 중에는 화면 밖 대기
+            if(this.py >= OY + GH - 25) { 
+                this.py = OY + GH - 25; 
+                this.v = 0;
+                this.ground = true; 
             }
             
-            if(Math.abs(this.obsX - (OX + 80)) < 18 && this.py > OY + GH - 45) stopGame("AREA 3: 충돌!");
+            // 20초 이후 2초 여유 후 왼쪽에서 오른쪽으로 벽 이동 (오른쪽의 플레이어를 향함)
+            if(score > 22) { 
+                const moveSpeed = (currentDiff === 'EASY' ? 3.0 : 4.5); // 벽 속도 하향
+                this.obsX += moveSpeed; 
+                if(this.obsX > OX + GW/2) this.obsX = OX - 20; // 왼쪽 끝에서 재출발
+            } else {
+                this.obsX = OX - 50; // 대기
+            }
+            
+            // 충돌 판정 (플레이어는 오른쪽 OX + GW/2 - 80 위치)
+            const playerX = OX + GW/2 - 80;
+            if(Math.abs(this.obsX - playerX) < 18 && this.py > OY + GH - 45) stopGame("AREA 3: 충돌!");
         },
         draw() {
             ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
             ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
             ctx.fillStyle = '#0f0';
-            ctx.fillRect(OX + 70, this.py-20, 20, 20);
+            // 캐릭터 위치를 오른쪽으로 변경
+            ctx.fillRect(OX + GW/2 - 90, this.py-20, 20, 20);
             ctx.fillStyle = '#ff0';
-            ctx.fillRect(this.obsX, OY + GH - 40, 12, 40);
+            ctx.fillRect(this.obsX, OY + GH - 40, 15, 40);
         }
     };
 
@@ -255,7 +271,10 @@
         ctx.fillText(msg, tx, ty + 15);
     }
 
-    window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'Escape' && gameActive) stopGame("중단"); });
+    window.addEventListener('keydown', e => { 
+        keys[e.code] = true; 
+        if(e.code === 'Escape' && gameActive) stopGame("중단"); 
+    });
     window.addEventListener('keyup', e => keys[e.code] = false);
     window.addEventListener('mousemove', e => {
         if(!gameActive) return;
@@ -265,8 +284,10 @@
     });
     window.addEventListener('mousedown', e => {
         if(!gameActive) return;
-        const rx = e.clientX, ry = e.clientY;
-        if(rx > OX + GW/2 && ry > OY + GH/2) area4.g = 0;
+        const rect = canvas.getBoundingClientRect();
+        const rx = e.clientX - rect.left;
+        const ry = e.clientY - rect.top;
+        if(rx > GW/2 && ry > GH/2) area4.g = 0;
     });
 
     window.runGame = (diff) => {
@@ -287,7 +308,7 @@
     };
 
     function startGame() {
-        gameActive = true; score = 0; stage = 1; warnArea = 0;
+        gameActive = true; score = 0; stage = 1;
         p1 = { x: OX + GW/4, y: OY + GH/4 };
         area1.enemies = []; area2.init(); area3.init(); area4.g = 0;
         canvas.style.display = 'block';
@@ -311,22 +332,19 @@
         score += 1/60;
         timerEl.innerText = score.toFixed(1);
 
-        // 구역 내부 경고 체크
         warnArea = 0;
         if(score >= 8 && score < 10) warnArea = 2;
         if(score >= 18 && score < 20) warnArea = 3;
         if(score >= 28 && score < 30) warnArea = 4;
 
         if(score > 30) stage = 4; else if(score > 20) stage = 3; else if(score > 10) stage = 2;
-        stageValEl.innerText = stage;
+        document.getElementById('stage-val').innerText = stage;
 
-        // 구역 업데이트 및 드로우
         area1.update(); area1.draw();
         if(stage >= 2) { area2.update(); area2.draw(); }
         if(stage >= 3) { area3.update(); area3.draw(); }
         if(stage >= 4) { area4.update(); area4.draw(); }
 
-        // 경고 출력
         if(warnArea > 0) drawWarningInArea(warnArea);
 
         ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
