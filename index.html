@@ -12,22 +12,23 @@
         .overlay { width: 100%; min-height: 100vh; background: rgba(0,0,0,0.94); display: flex; flex-direction: column; align-items: center; padding-top: 60px; position: relative; z-index: 100; }
         .hidden { display: none !important; }
         .btn { padding: 15px 40px; font-size: 20px; cursor: pointer; font-weight: bold; border: none; border-radius: 8px; transition: 0.2s; color: white; margin: 10px; outline: none; }
+        .btn:hover { transform: scale(1.05); filter: brightness(1.1); }
         
-        /* 볼륨 컨트롤 스타일 */
         #volume-control {
-            position: fixed; bottom: 40px; right: 20px; z-index: 1000;
-            background: rgba(0,0,0,0.6); padding: 10px; border-radius: 10px;
-            display: flex; align-items: center; gap: 10px; border: 1px solid #444;
+            position: fixed; bottom: 45px; right: 20px; z-index: 1000;
+            background: rgba(255,255,255,0.1); padding: 12px; border-radius: 12px;
+            display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(5px);
         }
-        #volume-slider { cursor: pointer; accent-color: var(--primary-color); }
+        #volume-slider { cursor: pointer; accent-color: var(--primary-color); width: 100px; }
 
-        /* 기존 스타일 유지 */
         #ranking-container { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 15px; width: 420px; margin-top: 30px; border: 1px solid rgba(255,255,255,0.1); }
         .tab-menu { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
         .tab-btn { background: #333; color: white; border: none; padding: 10px 22px; cursor: pointer; border-radius: 6px; font-size: 14px; }
         .tab-btn.active { background: var(--primary-color); color: #000; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; text-align: center; }
         th, td { padding: 14px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
         #game-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-size: 24px; z-index: 200; display: none; font-weight: bold; color: var(--neon-mint); text-align: center; width: 100%; }
         #countdown-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; font-weight: bold; color: var(--primary-color); z-index: 300; display: none; }
         canvas { position: fixed; top: 0; left: 0; z-index: 10; display: none; cursor: none; }
@@ -44,7 +45,7 @@
     <input type="range" id="volume-slider" min="0" max="100" value="30">
 </div>
 
-<div id="version-tag">Ver 1.2.5</div>
+<div id="version-tag">Ver 1.2.6</div>
 <canvas id="gameCanvas"></canvas>
 
 <div id="main-menu" class="overlay">
@@ -53,7 +54,6 @@
         <button class="btn" style="background:#2ecc71" onclick="runGame('EASY')">EASY MODE</button>
         <button class="btn" style="background:#e74c3c" onclick="runGame('HARD')">HARD MODE</button>
     </div>
-    
     <div id="ranking-container">
         <div class="tab-menu">
             <button class="tab-btn active" id="tab-EASY" onclick="loadRanking('EASY')">EASY RANK</button>
@@ -75,30 +75,35 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // --- 개선된 BGM 시스템 ---
+    // --- BGM System (볼륨 유지 로직 개선) ---
     let audioCtx, masterGain, musicInterval;
     const volSlider = document.getElementById('volume-slider');
 
     function initAudio() {
-        if (audioCtx) return;
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        masterGain = audioCtx.createGain();
-        masterGain.connect(audioCtx.destination);
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            masterGain = audioCtx.createGain();
+            masterGain.connect(audioCtx.destination);
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         updateVolume();
     }
 
     function updateVolume() {
-        if (masterGain) masterGain.gain.setTargetAtTime(volSlider.value / 400, audioCtx.currentTime, 0.05);
+        if (masterGain) {
+            // 게임 시작 전/중 모두 슬라이더 값을 즉시 반영
+            const val = volSlider.value / 400; 
+            masterGain.gain.setTargetAtTime(val, audioCtx.currentTime, 0.05);
+        }
     }
     volSlider.oninput = updateVolume;
 
-    function playNote(freq, type, duration, volume = 1, detune = 0) {
-        if (!audioCtx) return;
+    function playNote(freq, type, duration, volume = 1) {
+        if (!audioCtx || masterGain.gain.value <= 0) return;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        osc.detune.setValueAtTime(detune, audioCtx.currentTime);
         gain.gain.setValueAtTime(volume, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
         osc.connect(gain);
@@ -109,43 +114,25 @@
 
     let beat = 0;
     function startBGM() {
-        if (musicInterval) return;
+        if (musicInterval) clearInterval(musicInterval);
         musicInterval = setInterval(() => {
             if (!gameActive) return;
             const step = beat % 16;
-            
-            // Stage 1: 베이스 비트 (4/4 박자)
-            if (step % 4 === 0) playNote(55, 'triangle', 0.5, 0.8); // 킥 느낌
-            if (step % 8 === 4) playNote(110, 'square', 0.1, 0.3); // 스네어 느낌
-
-            // Stage 2: 코드 반주 레이어
-            if (stage >= 2 && step % 2 === 0) {
-                const chord = [220, 261, 329]; // Am
-                playNote(chord[step % 3], 'sawtooth', 0.2, 0.15);
-            }
-
-            // Stage 3: 빠른 아르페지오
-            if (stage >= 3) {
-                const arp = [440, 523, 659, 783];
-                playNote(arp[step % 4], 'sine', 0.1, 0.2);
-            }
-
-            // Stage 4: 긴박한 고음 리드
-            if (stage >= 4 && step % 4 === 2) {
-                playNote(880, 'square', 0.3, 0.1, Math.random() * 20);
-            }
-
+            if (step % 4 === 0) playNote(55, 'triangle', 0.4, 0.6); 
+            if (step % 8 === 4) playNote(110, 'square', 0.1, 0.2); 
+            if (stage >= 2 && step % 2 === 0) playNote([220, 261, 329][step % 3], 'sawtooth', 0.2, 0.1);
+            if (stage >= 3) playNote([440, 523, 659, 783][step % 4], 'sine', 0.1, 0.15);
+            if (stage >= 4 && step % 4 === 2) playNote(880, 'square', 0.2, 0.05);
             beat++;
-        }, 150); // BPM 약 100
+        }, 150);
     }
 
     function stopBGM() {
         clearInterval(musicInterval);
         musicInterval = null;
-        if (masterGain) masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
     }
 
-    // --- 게임 로직 (기존 로직 유지) ---
+    // --- Game Logic ---
     const firebaseConfig = {
         apiKey: "AIzaSyCWvmTD7ZqrM8QS2jAtIoxyYw9zDghyyZo",
         authDomain: "dummy-server-ff1b9.firebaseapp.com",
@@ -175,34 +162,13 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // 랭킹 로드/저장 로직은 이전과 동일 (생략하지 않고 코드에 포함)
-    window.loadRanking = async (diff) => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `tab-${diff}`));
-        const listDiv = document.getElementById('ranking-list');
-        listDiv.innerHTML = "로딩 중...";
-        try {
-            const q = query(collection(db, "dodge_rankings"), where("diff", "==", diff), orderBy("score", "desc"), limit(5));
-            const snap = await getDocs(q);
-            let html = "<table><tr><th>순위</th><th>닉네임</th><th>시간</th></tr>";
-            let rank = 1;
-            snap.forEach(doc => {
-                const data = doc.data();
-                html += `<tr><td>${rank}</td><td>${data.name}</td><td>${data.score.toFixed(1)}s</td></tr>`;
-                rank++;
-            });
-            listDiv.innerHTML = (rank === 1) ? "기록 없음" : html + "</table>";
-        } catch(e) { listDiv.innerHTML = "로드 실패"; }
-    };
-    loadRanking('EASY');
-
-    // 영역별 객체 (area1, area2, area3, area4) 정의는 기존 코드와 동일
     const area1 = {
         enemies: [],
         update() {
             let spawnRate = currentDiff === 'EASY' ? 0.01 : 0.02;
             let speedBase = currentDiff === 'EASY' ? 1.0 : 1.8;
-            if(score > 60) { spawnRate *= 2; speedBase *= 1.5; }
-            if(this.enemies.length < (score > 60 ? 6 : 3) && Math.random() < spawnRate) {
+            if(score > 60) { spawnRate *= 2.5; speedBase *= 1.6; } // LEVEL UP 강화
+            if(this.enemies.length < (score > 60 ? 10 : 4) && Math.random() < spawnRate) {
                 this.enemies.push({x: OX + Math.random()*(GW/2 - 20) + 10, y: OY - 20, s: speedBase + Math.random()*1.0});
             }
             this.enemies.forEach(e => {
@@ -217,14 +183,17 @@
             ctx.beginPath(); ctx.arc(p1.x, p1.y, 8, 0, Math.PI*2); ctx.fillStyle = '#0ff'; ctx.fill();
         }
     };
+
     const area2 = {
         px: 0, balls: [],
         init() { this.px = OX + GW * 0.75; this.balls = []; },
         update() {
-            if(keys['KeyA'] && this.px > OX + GW/2 + 15) this.px -= 3;
-            if(keys['KeyD'] && this.px < OX + GW - 15) this.px += 3;
+            if(keys['KeyA'] && this.px > OX + GW/2 + 15) this.px -= 3.5;
+            if(keys['KeyD'] && this.px < OX + GW - 15) this.px += 3.5;
             let spawnRate = currentDiff === 'EASY' ? 0.008 : 0.015;
-            if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: 2.5});
+            let speed = 2.5;
+            if(score > 70) { spawnRate *= 2.2; speed *= 1.5; } // LEVEL UP 강화
+            if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: speed});
             this.balls.forEach(b => {
                 b.y += b.s;
                 if(Math.abs(this.px - b.x) < 14 && Math.abs(OY + GH/2 - 30 - b.y) < 14) stopGame("AREA 2: 충돌!");
@@ -237,40 +206,57 @@
             this.balls.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, 7, 0, Math.PI*2); ctx.fill(); });
         }
     };
+
     const area3 = {
         py: 0, v: 0, ground: true, obsX: 0,
         init() { this.py = OY + GH - 25; this.v = 0; this.obsX = OX - 50; },
         update() {
-            if(keys['Space'] && this.ground) { this.v = -9; this.ground = false; }
-            this.v += 0.3; this.py += this.v;
+            if(keys['Space'] && this.ground) { this.v = -9.2; this.ground = false; }
+            this.v += 0.32; this.py += this.v;
             if(this.py >= OY + GH - 25) { this.py = OY + GH - 25; this.v = 0; this.ground = true; }
             if(score > 22) {
-                this.obsX += (currentDiff === 'EASY' ? 3 : 4.5);
+                let spd = (currentDiff === 'EASY' ? 3 : 4.5);
+                if(score > 80) spd *= 1.6; // LEVEL UP 강화
+                this.obsX += spd;
                 if(this.obsX > OX + GW/2 + 100) this.obsX = OX - 50;
             }
             if(Math.abs(this.obsX - (OX + GW/2 - 80)) < 15 && this.py > OY + GH - 40) stopGame("AREA 3: 충돌!");
         },
         draw() {
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.05)'; ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
-            ctx.fillStyle = '#0f0'; ctx.fillRect(OX + GW/2 - 90, this.py-20, 20, 20);
-            ctx.fillStyle = '#ff0'; ctx.fillRect(this.obsX, OY + GH - 40, 15, 40);
+            let darkness = (score >= 85) ? Math.min(0.8, (score - 85) / 10) : 0;
+            ctx.fillStyle = `rgba(0, 255, 0, ${0.05 * (1-darkness)})`; ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
+            ctx.fillStyle = `rgba(0, 255, 0, ${1-darkness})`; ctx.fillRect(OX + GW/2 - 90, this.py-20, 20, 20);
+            ctx.fillStyle = `rgba(255, 255, 0, ${1-darkness})`; ctx.fillRect(this.obsX, OY + GH - 40, 15, 40);
         }
     };
+
     const area4 = {
         g: 0,
         update() {
-            this.g += (currentDiff === 'EASY' ? 0.15 : 0.25);
+            let inc = (currentDiff === 'EASY' ? 0.15 : 0.25);
+            if(score > 90) inc *= 1.8; // LEVEL UP 강화
+            this.g += inc;
             if(this.g >= 100) stopGame("AREA 4: 폭발!");
         },
         draw() {
             ctx.fillStyle = 'rgba(255, 136, 0, 0.05)'; ctx.fillRect(OX + GW/2, OY + GH/2, GW/2, GH/2);
             ctx.fillStyle = '#333'; ctx.fillRect(OX + GW * 0.62, OY + GH * 0.75, 150, 25);
-            ctx.fillStyle = '#f80'; ctx.fillRect(OX + GW * 0.62, OY + GH * 0.75, this.g * 1.5, 25);
+            ctx.fillStyle = this.g > 80 ? '#f00' : '#f80';
+            ctx.fillRect(OX + GW * 0.62, OY + GH * 0.75, this.g * 1.5, 25);
         }
     };
 
+    function drawInfo(areaNum, text) {
+        ctx.fillStyle = "rgba(241, 196, 15, 0.9)";
+        ctx.font = "bold 20px Pretendard";
+        ctx.textAlign = "center";
+        let tx = areaNum % 2 === 1 ? OX + GW/4 : OX + GW*0.75;
+        let ty = areaNum <= 2 ? OY + GH/4 : OY + GH*0.75;
+        ctx.fillText(text, tx, ty);
+    }
+
     window.runGame = (diff) => {
-        initAudio();
+        initAudio(); // 오디오 컨텍스트 활성화 및 현재 볼륨 적용
         currentDiff = diff;
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('countdown-text').style.display = 'block';
@@ -321,14 +307,42 @@
         if(stage >= 3) { area3.update(); area3.draw(); }
         if(stage >= 4) { area4.update(); area4.draw(); }
 
-        ctx.strokeStyle = '#444';
+        // 가이드 및 LEVEL UP 메타데이터 표시
+        if(score >= 8 && score < 10) drawInfo(2, "준비: A, D 이동");
+        if(score >= 18 && score < 20) drawInfo(3, "준비: SPACE 점프");
+        if(score >= 28 && score < 30) drawInfo(4, "준비: 클릭 해제");
+        
+        if(score >= 60 && score < 61.5) drawInfo(1, "LEVEL UP! (Faster)");
+        if(score >= 70 && score < 71.5) drawInfo(2, "LEVEL UP! (More)");
+        if(score >= 80 && score < 81.5) drawInfo(3, "LEVEL UP! (Danger)");
+        if(score >= 90 && score < 91.5) drawInfo(4, "LEVEL UP! (Explosive)");
+
+        ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
         ctx.strokeRect(OX, OY, GW, GH);
         ctx.beginPath(); ctx.moveTo(OX + GW/2, OY); ctx.lineTo(OX + GW/2, OY + GH); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(OX, OY + GH/2); ctx.lineTo(OX + GW, OY + GH/2); ctx.stroke();
         requestAnimationFrame(animate);
     }
 
-    // 마우스 이벤트 등 유지...
+    window.loadRanking = async (diff) => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `tab-${diff}`));
+        const listDiv = document.getElementById('ranking-list');
+        listDiv.innerHTML = "로딩 중...";
+        try {
+            const q = query(collection(db, "dodge_rankings"), where("diff", "==", diff), orderBy("score", "desc"), limit(5));
+            const snap = await getDocs(q);
+            let html = "<table><tr><th>순위</th><th>닉네임</th><th>시간</th></tr>";
+            let rank = 1;
+            snap.forEach(doc => {
+                const data = doc.data();
+                html += `<tr><td>${rank}</td><td>${data.name}</td><td>${data.score.toFixed(1)}s</td></tr>`;
+                rank++;
+            });
+            listDiv.innerHTML = (rank === 1) ? "기록 없음" : html + "</table>";
+        } catch(e) { listDiv.innerHTML = "로드 실패"; }
+    };
+    loadRanking('EASY');
+
     window.addEventListener('keydown', e => keys[e.code] = true);
     window.addEventListener('keyup', e => keys[e.code] = false);
     window.addEventListener('mousemove', e => {
