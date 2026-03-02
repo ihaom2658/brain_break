@@ -34,7 +34,6 @@
         canvas { position: fixed; top: 0; left: 0; z-index: 10; display: none; cursor: none; }
         #version-tag { position: fixed; bottom: 12px; right: 18px; font-size: 12px; color: rgba(255, 255, 255, 0.3); z-index: 500; }
 
-        /* 표본 디자인 적용: 상세 가이드 섹션 */
         .content-section { max-width: 850px; width: 90%; margin: 60px 0; text-align: left; line-height: 2.0; color: #ccc; border-top: 1px solid #333; padding-top: 40px; }
         .content-section h2 { color: var(--primary-color); border-left: 5px solid var(--primary-color); padding-left: 15px; margin: 50px 0 25px; font-size: 28px; }
         .content-section p { margin-bottom: 25px; font-size: 16px; }
@@ -51,7 +50,7 @@
     <input type="range" id="volume-slider" min="0" max="100" value="30">
 </div>
 
-<div id="version-tag">Ver 1.1.6</div>
+<div id="version-tag">Ver 1.1.7</div>
 <canvas id="gameCanvas"></canvas>
 
 <div id="main-menu" class="overlay">
@@ -100,7 +99,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // --- BGM System ---
     let audioCtx, masterGain, musicInterval;
     const volSlider = document.getElementById('volume-slider');
 
@@ -156,7 +154,6 @@
         musicInterval = null;
     }
 
-    // --- Firebase & Game Logic ---
     const firebaseConfig = {
         apiKey: "AIzaSyCWvmTD7ZqrM8QS2jAtIoxyYw9zDghyyZo",
         authDomain: "dummy-server-ff1b9.firebaseapp.com",
@@ -197,7 +194,7 @@
             }
             this.enemies.forEach(e => {
                 e.y += e.s;
-                if(Math.hypot(p1.x - e.x, p1.y - e.y) < 16) stopGame("AREA 1: 충돌!");
+                if(Math.hypot(p1.x - e.x, p1.y - e.y) < 16) stopGame(true, "AREA 1: 충돌!");
             });
             this.enemies = this.enemies.filter(e => e.y < OY + GH/2);
         },
@@ -220,7 +217,7 @@
             if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: speed});
             this.balls.forEach(b => {
                 b.y += b.s;
-                if(Math.abs(this.px - b.x) < 14 && Math.abs(OY + GH/2 - 30 - b.y) < 14) stopGame("AREA 2: 충돌!");
+                if(Math.abs(this.px - b.x) < 14 && Math.abs(OY + GH/2 - 30 - b.y) < 14) stopGame(true, "AREA 2: 충돌!");
             });
             this.balls = this.balls.filter(b => b.y < OY + GH/2);
         },
@@ -244,7 +241,7 @@
                 this.obsX += spd;
                 if(this.obsX > OX + GW/2 + 100) this.obsX = OX - 50;
             }
-            if(Math.abs(this.obsX - (OX + GW/2 - 80)) < 15 && this.py > OY + GH - 40) stopGame("AREA 3: 충돌!");
+            if(Math.abs(this.obsX - (OX + GW/2 - 80)) < 15 && this.py > OY + GH - 40) stopGame(true, "AREA 3: 충돌!");
         },
         draw() {
             let darkness = (score >= 85) ? Math.min(0.8, (score - 85) / 10) : 0;
@@ -260,7 +257,7 @@
             let inc = (currentDiff === 'EASY' ? 0.15 : 0.25);
             if(score > 90) inc *= 1.8;
             this.g += inc;
-            if(this.g >= 100) stopGame("AREA 4: 폭발!");
+            if(this.g >= 100) stopGame(true, "AREA 4: 폭발!");
         },
         draw() {
             ctx.fillStyle = 'rgba(255, 136, 0, 0.05)'; ctx.fillRect(OX + GW/2, OY + GH/2, GW/2, GH/2);
@@ -298,21 +295,23 @@
         animate();
     }
 
-    function stopGame(reason) {
+    // 예시 코드의 stopGame(showResult, title) 로직 적용
+    function stopGame(showResult = false, title = "STOP") {
         if(!gameActive) return;
+        const finalScore = score;
         gameActive = false;
         stopBGM();
         document.exitPointerLock?.();
         canvas.style.display = 'none';
         document.getElementById('game-ui').style.display = 'none';
         
-        if(reason === "ESC") {
-            resetToMenu();
-            return;
+        if (showResult) {
+            document.getElementById('result-screen').classList.remove('hidden');
+            document.getElementById('result-title').innerText = title;
+            document.getElementById('final-stats').innerText = `버틴 시간: ${finalScore.toFixed(1)}s`;
+        } else {
+            document.getElementById('main-menu').classList.remove('hidden');
         }
-
-        document.getElementById('result-screen').classList.remove('hidden');
-        document.getElementById('final-stats').innerText = `시간: ${score.toFixed(1)}s (${reason})`;
     }
 
     window.resetToMenu = () => {
@@ -363,8 +362,8 @@
 
     window.addEventListener('keydown', e => {
         keys[e.code] = true;
-        // ESC 키 감지 시 즉시 종료 (새로고침 없이 허브 복귀)
-        if(e.code === 'Escape' && gameActive) stopGame("ESC");
+        // ESC 키 감지 시 예시 코드처럼 showResult를 true로 전달하여 결과 화면 표시
+        if(e.code === 'Escape' && gameActive) stopGame(true, "훈련 중단");
     });
     window.addEventListener('keyup', e => keys[e.code] = false);
     window.addEventListener('mousemove', e => {
