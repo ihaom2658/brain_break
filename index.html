@@ -9,7 +9,7 @@
             --neon-mint: #0ff;
         }
         body { margin: 0; background-color: #000; font-family: 'Pretendard', sans-serif; color: white; overflow: hidden; }
-        .overlay { width: 100%; min-height: 100vh; background: rgba(0,0,0,0.94); display: flex; flex-direction: column; align-items: center; padding-top: 40px; position: relative; z-index: 100; overflow-y: auto; }
+        .overlay { width: 100%; height: 100vh; background: rgba(0,0,0,0.94); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; z-index: 100; }
         .hidden { display: none !important; }
         .btn { padding: 15px 40px; font-size: 20px; cursor: pointer; font-weight: bold; border: none; border-radius: 8px; transition: 0.2s; color: white; margin: 10px; outline: none; }
         .btn:hover { transform: scale(1.05); filter: brightness(1.1); }
@@ -34,8 +34,8 @@
         canvas { position: fixed; top: 0; left: 0; z-index: 10; display: none; cursor: none; }
         #version-tag { position: fixed; bottom: 12px; right: 18px; font-size: 12px; color: rgba(255, 255, 255, 0.3); z-index: 500; }
 
-        .info-section { max-width: 600px; margin-top: 40px; padding: 20px; line-height: 1.6; color: #aaa; font-size: 14px; text-align: center; border-top: 1px solid #333; }
-        .info-section b { color: var(--primary-color); }
+        .game-desc { margin-top: 30px; text-align: center; color: #888; font-size: 14px; line-height: 1.6; }
+        .game-desc b { color: var(--primary-color); }
     </style>
 </head>
 <body>
@@ -48,7 +48,7 @@
     <input type="range" id="volume-slider" min="0" max="100" value="30">
 </div>
 
-<div id="version-tag">Ver 1.1.4</div>
+<div id="version-tag">Ver 1.1.5</div>
 <canvas id="gameCanvas"></canvas>
 
 <div id="main-menu" class="overlay">
@@ -66,14 +66,10 @@
         <div id="ranking-list">데이터 로딩 중...</div>
     </div>
 
-    <div class="info-section">
-        <h3>[ 게임 가이드 ]</h3>
-        <p>4개의 영역에서 동시에 벌어지는 시련을 견뎌내세요.<br>게임 도중 <b>ESC</b>를 누르면 중단할 수 있습니다.</p>
-        <p><b>영역 1 (좌상):</b> 마우스로 장애물을 피하세요.<br>
-        <b>영역 2 (우상):</b> A, D 키로 캐릭터를 조작하여 공을 피하세요.<br>
-        <b>영역 3 (좌하):</b> SPACE 키를 눌러 장애물을 점프하세요.<br>
-        <b>영역 4 (우하):</b> 게이지가 가득 차기 전 마우스 클릭으로 식히세요.</p>
-        <p>60초 이후부터는 <b>LEVEL UP</b>과 함께 난이도가 비약적으로 상승합니다!</p>
+    <div class="game-desc">
+        <p><b>[ 조작법 ]</b><br>
+        영역 1: 마우스 이동 | 영역 2: A, D 키 | 영역 3: SPACE 점프 | 영역 4: 마우스 클릭(게이지 감소)<br>
+        게임 중 <b>ESC</b>를 누르면 메인 화면으로 돌아갑니다.</p>
     </div>
 </div>
 
@@ -82,14 +78,14 @@
     <h2 id="final-stats" style="color: var(--primary-color); font-size: 28px;">버틴 시간: 0.0s</h2>
     <input type="text" id="nickname" placeholder="닉네임 입력" maxlength="8" style="padding:12px; border-radius:8px; border:none; margin-bottom:15px; text-align:center; width:240px; font-size: 18px;">
     <button class="btn" id="save-btn" style="background:var(--primary-color); color:#000;">기록 등록</button>
-    <button class="btn" style="background:#555;" onclick="location.reload()">다시 하기</button>
+    <button class="btn" style="background:#555;" onclick="resetToMenu()">메인으로</button>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // --- BGM System ---
+    // --- Audio ---
     let audioCtx, masterGain, musicInterval;
     const volSlider = document.getElementById('volume-slider');
 
@@ -145,7 +141,7 @@
         musicInterval = null;
     }
 
-    // --- Game Logic ---
+    // --- Firebase ---
     const firebaseConfig = {
         apiKey: "AIzaSyCWvmTD7ZqrM8QS2jAtIoxyYw9zDghyyZo",
         authDomain: "dummy-server-ff1b9.firebaseapp.com",
@@ -175,6 +171,7 @@
     window.addEventListener('resize', resize);
     resize();
 
+    // --- Areas ---
     const area1 = {
         enemies: [],
         update() {
@@ -259,15 +256,7 @@
         }
     };
 
-    function drawInfo(areaNum, text) {
-        ctx.fillStyle = "rgba(241, 196, 15, 0.9)";
-        ctx.font = "bold 20px Pretendard";
-        ctx.textAlign = "center";
-        let tx = areaNum % 2 === 1 ? OX + GW/4 : OX + GW*0.75;
-        let ty = areaNum <= 2 ? OY + GH/4 : OY + GH*0.75;
-        ctx.fillText(text, tx, ty);
-    }
-
+    // --- Core Functions ---
     window.runGame = (diff) => {
         initAudio();
         currentDiff = diff;
@@ -289,7 +278,7 @@
     function startGame() {
         gameActive = true; score = 0; stage = 1; beat = 0;
         p1 = { x: OX + GW/4, y: OY + GH/4 };
-        area2.init(); area3.init(); area4.g = 0;
+        area1.enemies = []; area2.init(); area3.init(); area4.g = 0;
         canvas.style.display = 'block';
         document.getElementById('game-ui').style.display = 'block';
         startBGM();
@@ -304,15 +293,21 @@
         canvas.style.display = 'none';
         document.getElementById('game-ui').style.display = 'none';
         
-        // ESC로 종료한 경우 결과 등록 화면 대신 메인으로 즉시 이동
         if(reason === "ESC") {
-            location.reload();
+            resetToMenu();
             return;
         }
 
         document.getElementById('result-screen').classList.remove('hidden');
         document.getElementById('final-stats').innerText = `시간: ${score.toFixed(1)}s (${reason})`;
     }
+
+    window.resetToMenu = () => {
+        gameActive = false;
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById('main-menu').classList.remove('hidden');
+        loadRanking(currentDiff);
+    };
 
     function animate() {
         if(!gameActive) return;
@@ -326,15 +321,6 @@
         if(stage >= 2) { area2.update(); area2.draw(); }
         if(stage >= 3) { area3.update(); area3.draw(); }
         if(stage >= 4) { area4.update(); area4.draw(); }
-
-        if(score >= 8 && score < 10) drawInfo(2, "준비: A, D 이동");
-        if(score >= 18 && score < 20) drawInfo(3, "준비: SPACE 점프");
-        if(score >= 28 && score < 30) drawInfo(4, "준비: 클릭 해제");
-        
-        if(score >= 60 && score < 61.5) drawInfo(1, "LEVEL UP! (Faster)");
-        if(score >= 70 && score < 71.5) drawInfo(2, "LEVEL UP! (More)");
-        if(score >= 80 && score < 81.5) drawInfo(3, "LEVEL UP! (Danger)");
-        if(score >= 90 && score < 91.5) drawInfo(4, "LEVEL UP! (Explosive)");
 
         ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
         ctx.strokeRect(OX, OY, GW, GH);
@@ -364,10 +350,7 @@
 
     window.addEventListener('keydown', e => {
         keys[e.code] = true;
-        // ESC 키 감지 및 종료
-        if(e.code === 'Escape' && gameActive) {
-            stopGame("ESC");
-        }
+        if(e.code === 'Escape' && gameActive) stopGame("ESC");
     });
     window.addEventListener('keyup', e => keys[e.code] = false);
     window.addEventListener('mousemove', e => {
@@ -382,7 +365,7 @@
     document.getElementById('save-btn').onclick = async () => {
         const nick = document.getElementById('nickname').value.trim() || "익명";
         await addDoc(collection(db, "dodge_rankings"), { diff: currentDiff, name: nick, score: score, timestamp: serverTimestamp() });
-        location.reload();
+        resetToMenu();
     };
 </script>
 </body>
