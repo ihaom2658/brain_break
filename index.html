@@ -31,7 +31,6 @@
         #game-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-size: 24px; z-index: 200; display: none; font-weight: bold; color: var(--neon-mint); text-align: center; width: 100%; }
         #countdown-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; font-weight: bold; color: var(--primary-color); z-index: 300; display: none; }
         #guide-msg { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: bold; color: #fff; z-index: 250; text-align: center; pointer-events: none; display: none; text-shadow: 0 0 15px rgba(0,0,0,1); }
-        #warning-msg { position: fixed; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 42px; font-weight: bold; color: var(--primary-color); z-index: 240; text-align: center; pointer-events: none; display: none; text-shadow: 0 0 20px rgba(241, 196, 15, 0.5); }
         
         canvas { position: fixed; top: 0; left: 0; z-index: 10; display: none; cursor: none; }
         #version-tag { position: fixed; bottom: 12px; right: 18px; font-size: 14px; color: rgba(255, 255, 255, 0.3); z-index: 500; }
@@ -44,9 +43,8 @@
 
 <div id="countdown-text"></div>
 <div id="guide-msg"></div>
-<div id="warning-msg"></div>
 <div id="game-ui">TIME: <span id="timer">0.0</span>s | STAGE: <span id="stage-val">1</span></div>
-<div id="version-tag">Ver 1.1.7</div>
+<div id="version-tag">Ver 1.1.8</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -108,11 +106,10 @@
     const timerEl = document.getElementById('timer');
     const stageValEl = document.getElementById('stage-val');
     const guideEl = document.getElementById('guide-msg');
-    const warningEl = document.getElementById('warning-msg');
 
     let gameActive = false, score = 0, stage = 1, currentDiff = 'EASY';
     let p1 = { x: 0, y: 0 }, keys = {};
-    let warnFlags = { s2: false, s3: false, s4: false };
+    let warnArea = 0; // 0: none, 2, 3, 4
 
     const GW = 800, GH = 600;
     let OX, OY;
@@ -151,12 +148,13 @@
     const area1 = {
         enemies: [],
         update() {
-            const spawnRate = currentDiff === 'EASY' ? 0.02 : 0.04;
-            const speedBase = currentDiff === 'EASY' ? 1.5 : 3;
-            if(Math.random() < spawnRate) this.enemies.push({x: OX + Math.random()*(GW/2 - 20) + 10, y: OY - 20, s: speedBase + Math.random()*2});
+            const spawnRate = currentDiff === 'EASY' ? 0.015 : 0.03; // 탄막 빈도 하향
+            const speedBase = currentDiff === 'EASY' ? 1.2 : 2.5; // 속도 소폭 하향
+            if(Math.random() < spawnRate) this.enemies.push({x: OX + Math.random()*(GW/2 - 20) + 10, y: OY - 20, s: speedBase + Math.random()*1.5});
             this.enemies.forEach(e => {
                 e.y += e.s;
-                if(Math.hypot(p1.x - e.x, p1.y - e.y) < 22) stopGame("AREA 1: 충돌!");
+                // 판정 완화: 히트박스 22 -> 16
+                if(Math.hypot(p1.x - e.x, p1.y - e.y) < 16) stopGame("AREA 1: 충돌!");
             });
             this.enemies = this.enemies.filter(e => e.y < OY + GH/2);
         },
@@ -164,8 +162,8 @@
             ctx.fillStyle = 'rgba(0, 255, 255, 0.08)';
             ctx.fillRect(OX, OY, GW/2, GH/2);
             ctx.fillStyle = '#0ff';
-            this.enemies.forEach(e => ctx.fillRect(e.x-8, e.y-8, 16, 16));
-            ctx.beginPath(); ctx.arc(p1.x, p1.y, 10, 0, Math.PI*2);
+            this.enemies.forEach(e => ctx.fillRect(e.x-6, e.y-6, 12, 12)); // 크기 축소
+            ctx.beginPath(); ctx.arc(p1.x, p1.y, 8, 0, Math.PI*2); // 플레이어 축소
             ctx.fillStyle = '#0ff'; ctx.fill();
             ctx.strokeStyle = '#fff'; ctx.stroke();
         }
@@ -177,11 +175,13 @@
         update() {
             if(keys['KeyA'] && this.px > OX + GW/2 + 15) this.px -= 5;
             if(keys['KeyD'] && this.px < OX + GW - 15) this.px += 5;
-            const spawnRate = currentDiff === 'EASY' ? 0.015 : 0.03;
-            if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: 3.5});
+            const spawnRate = currentDiff === 'EASY' ? 0.012 : 0.025; // 탄막 빈도 하향
+            const speedBase = (currentDiff === 'EASY' ? 3.5 : 5.0) * 0.65; // 속도 0.65배 적용
+            if(Math.random() < spawnRate) this.balls.push({x: OX + GW/2 + 10 + Math.random()*(GW/2 - 20), y: OY, s: speedBase});
             this.balls.forEach(b => {
                 b.y += b.s;
-                if(Math.abs(this.px - b.x) < 18 && Math.abs(OY + GH/2 - 30 - b.y) < 18) stopGame("AREA 2: 충돌!");
+                // 판정 완화
+                if(Math.abs(this.px - b.x) < 14 && Math.abs(OY + GH/2 - 30 - b.y) < 14) stopGame("AREA 2: 충돌!");
             });
             this.balls = this.balls.filter(b => b.y < OY + GH/2);
         },
@@ -189,38 +189,41 @@
             ctx.fillStyle = 'rgba(255, 0, 255, 0.05)';
             ctx.fillRect(OX + GW/2, OY, GW/2, GH/2);
             ctx.fillStyle = '#f0f';
-            ctx.fillRect(this.px-12, OY + GH/2 - 35, 24, 24);
+            ctx.fillRect(this.px-10, OY + GH/2 - 35, 20, 20); // 크기 축소
             this.balls.forEach(b => {
-                ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(b.x, b.y, 7, 0, Math.PI*2); ctx.fill();
             });
         }
     };
 
     const area3 = {
         py: 0, v: 0, ground: true, obsX: 0,
-        init() { this.py = OY + GH - 25; this.obsX = OX + GW/2; },
+        init() { this.py = OY + GH - 25; this.obsX = OX - 100; }, // 화면 밖에서 시작하여 지연 효과
         update() {
-            if(keys['Space'] && this.ground) { this.v = -13; this.ground = false; }
-            this.v += 0.7; this.py += this.v;
+            if(keys['Space'] && this.ground) { this.v = -12; this.ground = false; }
+            this.v += 0.65; this.py += this.v;
             if(this.py >= OY + GH - 25) { this.py = OY + GH - 25; this.ground = true; }
-            this.obsX -= (currentDiff === 'EASY' ? 4.5 : 7);
-            if(this.obsX < OX + 10) this.obsX = OX + GW/2 - 10;
-            if(Math.abs(this.obsX - (OX + 80)) < 22 && this.py > OY + GH - 50) stopGame("AREA 3: 충돌!");
+            
+            // 3구역 활성화 직후가 아니면 이동
+            this.obsX -= (currentDiff === 'EASY' ? 4.0 : 6.0);
+            if(this.obsX < OX - 20) this.obsX = OX + GW/2 - 10;
+            
+            if(Math.abs(this.obsX - (OX + 80)) < 18 && this.py > OY + GH - 45) stopGame("AREA 3: 충돌!");
         },
         draw() {
             ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
             ctx.fillRect(OX, OY + GH/2, GW/2, GH/2);
             ctx.fillStyle = '#0f0';
-            ctx.fillRect(OX + 70, this.py-25, 25, 25);
+            ctx.fillRect(OX + 70, this.py-20, 20, 20); // 캐릭터 축소
             ctx.fillStyle = '#ff0';
-            ctx.fillRect(this.obsX, OY + GH - 45, 15, 45);
+            ctx.fillRect(this.obsX, OY + GH - 40, 12, 40); // 장애물 축소
         }
     };
 
     const area4 = {
         g: 0,
         update() {
-            this.g += (currentDiff === 'EASY' ? 0.18 : 0.35);
+            this.g += (currentDiff === 'EASY' ? 0.15 : 0.30); // 게이지 속도 하향
             if(this.g >= 100) stopGame("AREA 4: 폭발!");
         },
         draw() {
@@ -233,16 +236,17 @@
         }
     };
 
-    function showGuide(text) {
-        guideEl.innerText = text;
-        guideEl.style.display = 'block';
-        setTimeout(() => { guideEl.style.display = 'none'; }, 2500);
-    }
-
-    function showWarning(stageNum) {
-        warningEl.innerText = `준비하세요! 잠시 후 AREA ${stageNum} 오픈`;
-        warningEl.style.display = 'block';
-        setTimeout(() => { warningEl.style.display = 'none'; }, 2000);
+    function drawWarningInArea(stageNum) {
+        ctx.fillStyle = "rgba(241, 196, 15, 0.9)";
+        ctx.font = "bold 22px Pretendard";
+        ctx.textAlign = "center";
+        let tx, ty, msg = "";
+        if(stageNum === 2) { tx = OX + GW*0.75; ty = OY + GH/4; msg = "A, D로 이동!"; }
+        if(stageNum === 3) { tx = OX + GW/4; ty = OY + GH*0.75; msg = "SPACE로 점프!"; }
+        if(stageNum === 4) { tx = OX + GW*0.75; ty = OY + GH*0.75; msg = "클릭하여 해제!"; }
+        
+        ctx.fillText("잠시 후 시작", tx, ty - 15);
+        ctx.fillText(msg, tx, ty + 15);
     }
 
     window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'Escape' && gameActive) stopGame("중단"); });
@@ -277,13 +281,11 @@
     };
 
     function startGame() {
-        gameActive = true; score = 0; stage = 1;
+        gameActive = true; score = 0; stage = 1; warnArea = 0;
         p1 = { x: OX + GW/4, y: OY + GH/4 };
         area1.enemies = []; area2.init(); area3.init(); area4.g = 0;
-        warnFlags = { s2: false, s3: false, s4: false };
         canvas.style.display = 'block';
         document.getElementById('game-ui').style.display = 'block';
-        showGuide("Area 1: 마우스로 회피!");
         animate();
     }
 
@@ -295,7 +297,6 @@
         document.getElementById('game-ui').style.display = 'none';
         document.getElementById('result-screen').classList.remove('hidden');
         document.getElementById('final-stats').innerText = `시간: ${score.toFixed(1)}s (${reason})`;
-        warningEl.style.display = 'none';
     }
 
     function animate() {
@@ -304,24 +305,23 @@
         score += 1/60;
         timerEl.innerText = score.toFixed(1);
 
-        // 사전 경고 체크 (각 단계 2초 전)
-        if(score >= 8 && score < 10 && !warnFlags.s2) { showWarning(2); warnFlags.s2 = true; }
-        if(score >= 18 && score < 20 && !warnFlags.s3) { showWarning(3); warnFlags.s3 = true; }
-        if(score >= 28 && score < 30 && !warnFlags.s4) { showWarning(4); warnFlags.s4 = true; }
+        // 구역 내부 경고 체크
+        warnArea = 0;
+        if(score >= 8 && score < 10) warnArea = 2;
+        if(score >= 18 && score < 20) warnArea = 3;
+        if(score >= 28 && score < 30) warnArea = 4;
 
-        const ps = stage;
         if(score > 30) stage = 4; else if(score > 20) stage = 3; else if(score > 10) stage = 2;
-        if(stage !== ps) {
-            if(stage === 2) showGuide("Area 2: A, D로 이동!");
-            if(stage === 3) showGuide("Area 3: SPACE로 점프!");
-            if(stage === 4) showGuide("Area 4: 클릭으로 게이지 관리!");
-        }
         stageValEl.innerText = stage;
 
+        // 구역 업데이트 및 드로우
         area1.update(); area1.draw();
         if(stage >= 2) { area2.update(); area2.draw(); }
         if(stage >= 3) { area3.update(); area3.draw(); }
         if(stage >= 4) { area4.update(); area4.draw(); }
+
+        // 경고 출력
+        if(warnArea > 0) drawWarningInArea(warnArea);
 
         ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
         ctx.strokeRect(OX, OY, GW, GH);
